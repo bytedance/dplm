@@ -1,0 +1,11 @@
+# @package _global_
+
+# specify here default evaluation configuration
+defaults:
+  - _self_
+  - config
+
+experiment_path: ??? # experiment folder containing checkpoints and configs (.hydra)
+ckpt_path: ??? # passing checkpoint path is necessary
+data_split: test # train, valid, test
+mode: [test, predict] # test, or predict

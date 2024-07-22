@@ -1,0 +1,29 @@
+model_summary:
+  _target_: pytorch_lightning.callbacks.RichModelSummary
+  max_depth: 2
+
+# rich_progress_bar:
+#   _target_: src.utils.callbacks.BetterRichProgressBar
+#   leave: false
+
+model_checkpoint:
+  _target_: byprot.utils.callbacks.ModelCheckpoint
+  monitor: ${train.monitor} # name of the logged metric which determines when model is improving
+  mode: ${train.mode} # "max" means higher metric value is better, can be also "min"
+  save_top_k: 1 # save k best models (determined by above metric)
+  save_last: True # additionaly always save model from last epoch
+  verbose: True
+  dirpath: "checkpoints" #${paths.ckpt_dir}
+  filename: "epoch_{epoch}-step_{global_step}-${train.monitor}_{${train.monitor}:.2f}"
+  auto_insert_metric_name: False
+  every_n_train_steps: ${train.val_and_save_every_n_steps}
+  # save_on_train_epoch_end: true
+  every_n_epochs: null
+
+early_stopping:
+  _target_: pytorch_lightning.callbacks.EarlyStopping
+  monitor: ${train.monitor} # name of the logged metric which determines when model is improving
+  mode: ${train.mode} # "max" means higher metric value is better, can be also "min"
+  patience: ${train.patience} # how many validation epochs of not improving until training stops
+  min_delta: 0 # minimum change in the monitored metric needed to qualify as an improvement
+  check_on_train_epoch_end: false

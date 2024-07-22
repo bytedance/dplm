@@ -1,0 +1,7 @@
+defaults:
+  - deepspeed_zero2.yaml
+
+
+precision: 16
+
+# sync_batchnorm: True

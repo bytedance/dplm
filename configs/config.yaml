@@ -1,0 +1,47 @@
+# @package _global_
+
+# specify here default training configuration
+defaults:
+  - _self_
+  - callbacks: # pytorch-lightning callbacks
+    - default
+
+  # - trainer: ddp
+  - logger: null # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
+  - paths: default
+  - hydra: default
+  - experiment: lm/dplm_150m # specifies pipeline and model
+
+# default name for the experiment, determines logging folder path
+# (you can overwrite this name in experiment configs)
+name: ???
+
+train:
+  # set False to skip model training
+  train: True
+  # evaluate on test set, using best model weights achieved during training
+  # lightning chooses best weights based on the metric specified in checkpoint callback
+  test: True
+
+  debug: false  
+
+  force_restart: false # force to train from scratch
+
+  # simply provide checkpoint path to resume training
+  # it can be either an absolute path, 
+  # or an relative path which will then be inferred from
+  # 1) current workding directory (cwd), or
+  # 2) checkpoint directory (${paths.ckpt_dir})
+  ckpt_path: last.ckpt
+
+  seed: 42 # seed for random number generators in pytorch, numpy and python.random
+
+  lr: 1e-3 # learning rate
+  monitor: ??? # name of the logged metric which determines when model is improving. Used by scheduler (plateau), checkpointer, and early stopping
+  mode: ??? # "max" means higher metric value is better, can be also "min". Used by scheduler (plateau), checkpointer, and early stopping
+  patience: 30 # how many validation epochs of not improving until training stops 
+  val_and_save_every_n_steps: null
+
+print_config: True # pretty print config at the start of the run using Rich library
+ignore_warnings: True # disable python warnings if they annoy you
+seed: 42 # seed for random number generators in pytorch, numpy and python.random

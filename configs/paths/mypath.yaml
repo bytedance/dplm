@@ -1,0 +1,17 @@
+# path to root directory
+# this requires PROJECT_ROOT environment variable to exist
+# PROJECT_ROOT is inferred and set by pyrootutils package in entry_point program e.g., `train.py`.
+root_dir: ${oc.env:PROJECT_ROOT}/..
+
+# path to data directory
+data_dir: ${paths.root_dir}/data-bin
+
+# path to logging directory, which is also 
+# the path to output directory, created dynamically by hydra
+# path generation pattern is specified in `configs/hydra/default.yaml`
+# use it to store all files generated during the run, like ckpts and metrics
+log_dir: ${paths.root_dir}/byprot-checkpoints/${name}
+#log_dir: ${paths.root_dir}/byprot-tensorboard/${name}
+
+ckpt_dir: ${paths.root_dir}/byprot-checkpoints/${name}/checkpoints
+

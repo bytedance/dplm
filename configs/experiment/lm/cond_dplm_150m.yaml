@@ -1,0 +1,92 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - /datamodule: cath_4.3  
+  - /callbacks: fixedbb
+  - /trainer: ddp_fp16
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+# name of the run determines folder name in logs
+project: "DPLM_cond_650m"
+name: "dplm_cond_650m_cath4.3"
+
+datamodule:
+  alphabet:
+    name: esm
+    featurizer: cath
+    featurizer_cfg:
+      coord_nan_to_zero: false
+
+model:
+  _target_: cond_dplm
+  decoder:
+    num_diffusion_timesteps: 100
+    adapter_dropout: 0.1
+    dplm_name: airkingbd/dplm_150m
+    encoder_d_model: ${model.encoder.d_model}
+  encoder:
+    _target_: gvp_trans_encoder
+    output_logits: ${task.learning.output_encoder_logits}
+    d_model: 512
+
+  init_pred_where: true
+
+task:
+  _target_: lm/cond_dplm
+  alphabet: ${datamodule.alphabet}
+  learning:
+    noise: random_mask # enable cmlm training with uniform random masking
+    watch_t1_t2_loss: false
+    cal_constant_loss: false
+    weight: linear
+    output_encoder_logits: true
+  criterion:
+    _target_: byprot.modules.cross_entropy.RDMCrossEntropyLoss
+    label_smoothing: 0.0
+    ignore_index: 1
+  optimizer:
+    type: adamw
+    _partial_: true
+    lr: ${train.lr}
+    betas: 
+      - 0.9
+      - 0.98
+    weight_decay: 0.0001
+  lr_scheduler:
+    type: noam
+    warmup_steps: 4000
+    model_size: 128
+    lr: ${train.lr}
+    warmup_init_lr: 1e-07
+  generator:
+    max_iter: 10
+    strategy: 'discrete_diffusion'
+    temperature: 1.0
+    eval_plddt: False
+    sampling_strategy: 'argmax'
+    use_draft_seq: true
+
+train:
+  seed: 42
+  lr: 0.001
+  monitor: "val/acc_median"
+  mode: "max"
+
+trainer:
+  min_epochs: 10
+  max_epochs: 10000
+  gradient_clip_val: 0.0
+  # val_check_interval: 10
+  num_sanity_val_steps: 1
+  reload_dataloaders_every_n_epochs: 1
+  use_distributed_sampler: false
+  max_steps: 200_000
+  accumulate_grad_batches: 1
+  check_val_every_n_epoch: 1
+  val_check_interval: 1.0
+  enable_progress_bar: true

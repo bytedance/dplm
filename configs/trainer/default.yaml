@@ -1,0 +1,17 @@
+_target_: pytorch_lightning.Trainer
+
+accelerator: 'gpu'
+devices: 'auto'
+
+min_epochs: 1
+max_epochs: 10
+enable_progress_bar: true
+log_every_n_steps: 10
+val_check_interval: ${train.val_and_save_every_n_steps}
+check_val_every_n_epoch: null
+
+# number of validation steps to execute at the beginning of the training
+# num_sanity_val_steps: 0
+
+# ckpt path
+# resume_from_checkpoint: null

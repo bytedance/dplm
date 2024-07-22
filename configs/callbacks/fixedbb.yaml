@@ -1,0 +1,44 @@
+defaults:
+  - default.yaml
+
+model_checkpoint:
+  _target_: byprot.utils.callbacks.ModelCheckpoint
+  monitor: "val/acc_median" # name of the logged metric which determines when model is improving
+  mode: "max" # "max" means higher metric value is better, can be also "min"
+  save_top_k: 3 # save k best models (determined by above metric)
+  save_last: True # additionaly always save model from last epoch
+  verbose: True
+  dirpath: ${paths.ckpt_dir}
+  filename: "step_{global_step}-ppl_{val/ppl:.2f}-acc_median_{val/acc_median:.2f}"
+  auto_insert_metric_name: False
+  every_n_train_steps: 0
+  every_n_epochs: 1
+  # every_n_train_steps: 10
+
+early_stopping:
+  _target_: pytorch_lightning.callbacks.EarlyStopping
+  monitor: "val/acc_median" # name of the logged metric which determines when model is improving
+  mode: "max" # "max" means higher metric value is better, can be also "min"
+  patience: 30 # how many validation epochs of not improving until training stops
+  min_delta: 0 # minimum change in the monitored metric needed to qualify as an improvement
+  check_on_train_epoch_end: false
+
+# CheckpointEveryNSteps:
+#   _target_: src.utils.callbacks.CheckpointEveryNSteps
+#   save_step_frequency: 5
+
+# val_every_Nsteps:
+#   _target_: src.utils.callbacks.ValEveryNSteps
+#   every_n_step: 10
+
+# model_summary:
+#   _target_: pytorch_lightning.callbacks.RichModelSummary
+#   max_depth: -1
+
+# rich_progress_bar:
+#   _target_: src.utils.callbacks.BetterRichProgressBar
+#   leave: true
+
+# lr_monitor:
+#   _target_: pytorch_lightning.callbacks.LearningRateMonitor
+#   logging_interval: 'step'

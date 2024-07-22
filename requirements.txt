@@ -1,0 +1,57 @@
+# --------- pytorch --------- #
+pytorch_lightning==2.2.0
+lightning==2.2.0
+torchmetrics
+torch_geometric
+# torch_scatter
+torchtext==0.16.0
+
+# --------- hydra --------- #
+hydra-core==1.2.0
+hydra-colorlog==1.2.0
+hydra-optuna-sweeper==1.2.0
+
+# --------- loggers --------- #
+# wandb
+tensorboard
+
+# --------- linters --------- #
+pyrootutils     # standardizing the project root setup
+pre-commit      # hooks for applying linters on commit
+black           # code formatting
+isort           # import sorting
+flake8          # code analysis
+nbstripout      # remove output from jupyter notebooks
+
+# --------- others --------- #
+python-dotenv   # loading env variables from .env file
+rich            # beautiful text formatting in terminal
+pytest          # tests
+sh              # for running bash commands in some tests
+pudb            # debugger
+
+# --------- project related --------- #
+biopython==1.79
+biotite
+datasets==2.20.0
+deepspeed==0.14.4
+dm-tree
+e3nn
+einops
+debugpy
+fair-esm
+lmdb
+matplotlib
+mdtraj
+ml-collections
+modelcif
+opt_einsum
+pandas
+peft==0.11.1
+scikit-learn
+seaborn
+sympy
+tmtools
+transformers==4.39.2
+MDAnalysis
+

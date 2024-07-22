@@ -1,0 +1,9 @@
+defaults:
+  - default.yaml
+
+accelerator: 'cuda'
+devices: 'auto'
+strategy: ddp_find_unused_parameters_true # ddp_sharded
+precision: 32
+
+# sync_batchnorm: True

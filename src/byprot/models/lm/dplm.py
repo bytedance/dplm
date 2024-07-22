@@ -1,3 +1,8 @@
+
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
+
 import math
 from dataclasses import dataclass, field
 import numpy as np

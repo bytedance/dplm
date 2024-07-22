@@ -1,3 +1,16 @@
+
+# Copyright (c) 2022 Jason Yim, Brian L Trippe, Valentin De Bortoli, Emile Mathieu
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file has been modified by Xinyou Wang on Jul 21, 2024
+#
+# Original file was released under MIT, with the full license text
+# available at https://github.com/jasonkyuyim/se3_diffusion/blob/master/LICENSE
+#
+# This modified file is released under the same license.
+
+
 """ Metrics. """
 import mdtraj as md
 import numpy as np

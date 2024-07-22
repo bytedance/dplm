@@ -1,3 +1,8 @@
+
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
+
 # The get_motif function of this code is highly motivated by EvoDiff:
 # https://github.com/microsoft/evodiff
 

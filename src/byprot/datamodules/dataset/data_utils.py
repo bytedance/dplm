@@ -1,3 +1,8 @@
+
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
+
 from typing import Any, Callable, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union
 import numpy as np
 import esm

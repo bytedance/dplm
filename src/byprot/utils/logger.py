@@ -1,3 +1,8 @@
+
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
+
 from lightning.pytorch.loggers.wandb import WandbLogger
 from lightning.pytorch.loggers.logger import Logger
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Mapping, Optional, Union

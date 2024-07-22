@@ -1,3 +1,8 @@
+
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
+
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR
 import torch

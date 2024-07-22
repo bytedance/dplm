@@ -1,3 +1,16 @@
+
+# Copyright (c) 2023 Meta Platforms, Inc. and affiliates
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file has been modified by Xinyou Wang on Jul 21, 2024
+#
+# Original file was released under MIT, with the full license text
+# available at https://github.com/facebookresearch/esm/blob/main/LICENSE
+#
+# This modified file is released under the same license.
+
+
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 
 # This source code is licensed under the MIT license found in the

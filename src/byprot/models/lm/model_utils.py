@@ -1,3 +1,8 @@
+
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
+
 from byprot.models.lm.esm_dplm import EsmForDPLM
 from dataclasses import dataclass, field
 from transformers import AutoModelForMaskedLM, AutoConfig, AutoTokenizer

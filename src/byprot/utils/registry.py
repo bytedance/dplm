@@ -1,3 +1,8 @@
+
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
+
 from byprot.datamodules import DATAMODULE_REGISTRY
 from byprot.models import MODEL_REGISTRY
 from byprot.tasks import TASK_REGISTRY

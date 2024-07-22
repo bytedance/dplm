@@ -1,43 +1,32 @@
 <!-- <div align="center"> -->
 
-# Diffusion Language Models Are Versatile Protein Learners
+# Official Implemetation of DPLM (ICML'24) - Diffusion Language Models Are Versatile Protein Learners
 <a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-ee4c2c?logo=pytorch&logoColor=white"></a>
 <a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Lightning-792ee5?logo=pytorchlightning&logoColor=white"></a>
 <a href="https://hydra.cc/"><img alt="Config: Hydra" src="https://img.shields.io/badge/Config-Hydra-89b8cd"></a>
 <a href="https://github.com/ashleve/lightning-hydra-template"><img alt="Template" src="https://img.shields.io/badge/-Lightning--Hydra--Template-017F2F?style=flat&logo=github&labelColor=gray"></a><br>
 
-The repository is an official implementation of ICML24 paper [Diffusion Language Models Are Versatile Protein Learners]([[2402.18567\] Diffusion Language Models Are Versatile Protein Learners (arxiv.org)](https://arxiv.org/abs/2402.18567)), which introduces **d**iffusion **p**rotein **l**anguage **m**odel (DPLM), a versatile protein language model that demonstrates strong generative and predictive capabilities for protein sequences. Specifically, DPLM exhibits impressive performance in protein sequence generation, motif scaffolding, inverse folding, and representation learning.
+The repository is an official implementation of ICML24 paper [Diffusion Language Models Are Versatile Protein Learners](https://arxiv.org/abs/2402.18567), which introduces **d**iffusion **p**rotein **l**anguage **m**odel (DPLM), a versatile protein language model that demonstrates strong generative and predictive capabilities for protein sequences. Specifically, DPLM exhibits impressive performance in protein sequence generation, motif scaffolding, inverse folding, and representation learning.
 
-We develop DPLM based on the [ByProt](https://github.com/BytedProtein/ByProt), which is a versatile toolkit designed for generative learning in protein research. This repository contains pretraining scripts of DPLM, and running scripts of various protein generation and understanding tasks as below:
-
-- **Unconditional protein sequence sampling**
+We develop DPLM based on the [ByProt](https://github.com/BytedProtein/ByProt). This repository contains pretraining scripts of DPLM, and running scripts of various protein generation and understanding tasks as below:
+- **Unconditional protein sequence sampling**:
   DPLM is capable of generating protein sequences with reasonable predicted structures unconditionally.
-
-- **Sequence-conditioned generation: motif scaffolding**
-
+- **Sequence-conditioned generation: motif scaffolding**:
   DPLM can generate reasonable scaffold sequences given the specific functional motifs. 
-
-- **Structure-conditioned generation: inverse folding**
-
+- **Structure-conditioned generation: inverse folding**:
   DPLM can produces sequences that can confidently fold into the given backbone structure.
-
-- **Representation learning**
-
+- **Representation learning**:
   DPLM is a superior protein sequence representation learner, demonstrating impressive performance across a variety of protein predictive tasks.
-
-- **Controllable generation**
-
+- **Controllable generation**:
   DPLM enjoys plug-and-play programmability, generating samples satisfying provided secondary structure annotations.
 
 ![DPLM](./assets/main.png)
 
 ## Installation
 
-To set up DPLM, follow these straightforward steps:
-
 ```bash
 # clone project
-git clone --recursive https://url/to/this/repo/DPLM.git
+git clone --recursive https://url/to/this/repo/dplm.git
 cd DPLM
 
 # create conda virtual environment
@@ -56,17 +45,17 @@ bash install.sh
 
 **Download the preprocessed UniRef50 dataset**
 
-We pretrain DPLM on the UniRef50 dataset, which contains about 42 million protein sequences. We obtain the preprocessed UniRef50 dataset provided by [Protein generation with evolutionary diffusion: sequence is all you need (Alamdari et al, 2023)](https://www.biorxiv.org/content/10.1101/2023.09.11.556673v1).
+We pretrain DPLM on the UniRef50 dataset, which contains about 42 million protein sequences. We obtain the preprocessed UniRef50 dataset provided by [EvoDiff (Alamdari et al, 2023)](https://www.biorxiv.org/content/10.1101/2023.09.11.556673v1).
 
 ```bash
 bash scripts/download_uniref50.sh
 ```
 
-### Pretraining script
+### Training
 
-We pretrain DPLM with approximate 1 million tokens per batch and 100,000 training steps. The training script is as follows:
+We train DPLM with approximate 1 million tokens per batch and 100,000 training steps. The training script is as follows:
 
-- The following script is runned on one node with 8 A100 GPU. If you want to pretrain on multi nodes, you can adjust the total number of tokens by ensuring that the `max_tokens` \* `accumulate_grad_batches`\*`GPU_number` is approximately 1 million.
+- The following script is runned on one node with 8 A100 GPU. If you want to train on multi nodes, you can adjust the total number of tokens by ensuring that the `max_tokens` \* `accumulate_grad_batches`\*`GPU_number` is approximately 1 million.
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
@@ -76,17 +65,15 @@ accumulate_grad_batches=16
 # this means the effective batch size is GPU_number(8) * max_tokens(8192) * accumulate_grad_batcher(16), resulting in approximately 1 million.
 
 exp=lm/dplm_650m
-name=dplm_650m
+model_name=dplm_650m
 
 python train.py \
-    experiment=${exp} name=${name} \
-    \
-    `# training hyperparams` \
+    experiment=${exp} name=${model_name} \
     datamodule.max_tokens=${max_tokens} \
     trainer.accumulate_grad_batches=${accumulate_grad_batches}
 ```
 
-Users can adjust the detail training setting in the `configs/experiment/lm/dplm_650m.yaml` according to their environment.
+You can adjust the other training configurations in the `configs/experiment/lm/dplm_650m.yaml` as needed. 
 
 ## Model checkpoints
 
@@ -107,9 +94,9 @@ model_name = "airkingbd/dplm_650m"
 dplm = DiffusionProteinLanguageModel.from_pretrained(model_name)
 ```
 
-## Unconditional protein sequence sampling
+## Unconditional protein sequence generation
 
-The results of unconditional sequence sampling for DPLMs of different scales (150M, 650M, 3B) are shown in the table below. For more details, please refer to our paper.
+The results of unconditional protein sequence generation of DPLM of different scales (150M, 650M, 3B) are shown in the table below. For more details, please refer to our paper.
 
 
 | Length | 100           | 200           | 300           | 400           | 500           | 600           | 700           | 800           | 900            | 1000           |
@@ -118,7 +105,7 @@ The results of unconditional sequence sampling for DPLMs of different scales (15
 | 650M   | 74.00 (+0.69) | 85.61 (+1.31) | 85.91 (+1.09) | 88.16 (+1.26) | 82.58 (+0.87) | 84.38 (+2.85) | 83.87 (+2.31) | 83.00 (+2.08) | 84.92  (+6.21) | 81.51  (+9.41) |
 | 3B     | 77.78 (+4.47) | 86.16 (+1.86) | 87.39 (+2.57) | 90.06 (+3.16) | 87.43 (+5.72) | 86.01 (+4.48) | 84.64 (+3.08) | 85.88 (+4.96) | 85.93 (+7.22)  | 83.86 (+11.76) |
 
-The following script shows how to generate new protein sequences using the pretrained DPLM model:
+To generate new protein sequences using a pre-trained DPLM model:
 
 ```bash
 model_name=dplm_650m # choose from dplm_150m, dplm_650m, dplm_3b
@@ -131,10 +118,10 @@ python generate.py --model_name ${model_name} \
 	--saveto ${output_dir}
 	
 # Evaluation
-bash anylasis/plddt_compute.sh ${output_dir} # pLDDT is obtained by ESMFold
+bash anylasis/plddt_compute.sh ${output_dir} # compute pLDDT using ESMFold
 ```
 
-We also provide evaluation scripts in the  `anylasis` folder. Users can use the `analysis/uncond_analysis.ipynb` to obtain average pLDDT score of each length and draw the line chart of the pLDDT score.
+We also provide evaluation scripts in the  `analysis` folder. Users can use the `analysis/uncond_analysis.ipynb` to obtain average pLDDT score of each length and draw the line chart of the pLDDT score.
 
 ## Sequence-conditioned generation: motif scaffolding
 
@@ -178,7 +165,7 @@ For evaluation, users can use the `analysis/motif_analysis.ipynb` to obtain succ
 
 ## **Structure-conditioned generation: inverse folding**
 
-The partial results on the CATH4.3 dataset are shown in the table below. For more details, please refer to our paper.
+The partial results on the CATH 4.3 dataset are shown in the table below. For more details, please refer to our paper.
 
 | Models    | Trainable Params. | AAR       | scTM     | pLDDT     |
 |-----------|-------------------|-----------|----------|-----------|
@@ -246,12 +233,9 @@ The training and evaluation pipeline is based on the [Saprot](https://github.com
 
 ## Acknowledgements
 
-DPLM extends its gratitude to the following projects and individuals:
+DPLM extends its gratitude to the following projects and individuals.
 
-- [PyTorch Lightning](https://www.pytorchlightning.ai/) and [lightning-hydra-template](https://github.com/ashleve/lightning-hydra-template) for providing a robust foundation for our development process.
-
-DPLM draws inspiration and leverages/modifies implementations from the following repositories:
-
+We draw inspiration and leverages/modifies implementations from:
 - [microsoft/evodiff](https://github.com/microsoft/evodiff) for the preprocessed UniRef50 dataset, sequence sampling evaluation implementation and data pipeline.
 - [westlake-repl/SaProt](https://github.com/westlake-repl/SaProt/tree/main) for the representation learning evaluation pipeline.
 

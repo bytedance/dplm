@@ -15,7 +15,8 @@ import numpy as np
 import torch
 from byprot import utils
 from byprot.models.lm.dplm import DiffusionProteinLanguageModel
-from scripts.design_pdb import prepare_data
+from byprot.datamodules.dataset.data_utils import PDBDataProcessor
+from copy import deepcopy
 import esm
 import esm.inverse_folding
 import pandas as pd
@@ -81,6 +82,35 @@ chain_dict = {
     '6e6r': 'A',
     '6exz': 'A',
 }
+
+    
+def prepare_data(pdb_path, alphabet, collator, num_seqs, device):
+    def _full_mask(target_tokens, coord_mask, alphabet):
+        target_mask = (
+            target_tokens.ne(alphabet.padding_idx)  # & mask
+            & target_tokens.ne(alphabet.cls_idx)
+            & target_tokens.ne(alphabet.eos_idx)
+        )
+        _tokens = target_tokens.masked_fill(
+            target_mask, alphabet.mask_idx
+        )
+        _mask = _tokens.eq(alphabet.mask_idx) & coord_mask
+        return _tokens, _mask
+    
+    pdb_id = Path(pdb_path).stem
+    structure = PDBDataProcessor().parse_PDB(pdb_path)
+    batch = collator(
+        [
+            deepcopy(structure) for idx in range(num_seqs)
+        ]
+    )
+    prev_tokens, prev_token_mask = _full_mask(
+        batch['tokens'], batch['coord_mask'], alphabet
+    )
+    batch['prev_tokens'] = prev_tokens
+    batch['prev_token_mask'] = prev_tokens.eq(alphabet.mask_idx)
+    batch = utils.recursive_to(batch, device=device)
+    return batch, structure['seq']
 
 def get_intervals(list, single_res_domain=False):
     "Given a list (Tensor) of non-masked residues get new start and end index for motif placed in scaffold"
@@ -152,12 +182,6 @@ def get_initial(args, tokenizer, pdb, min_len, max_len, device):
     bos = tokenizer.cls_token_id
     eos = tokenizer.eos_token_id
     pad = tokenizer.pad_token_id
-    # # check whether motif_pdb is right
-    # motif_seq = collater([(motif,)])['input_ids'][0]
-    # motif_mask = motif_seq.ne(0) & motif_seq.ne(2) & motif_seq.ne(32) & motif_seq.ne(1)
-    # motif_seq = torch.masked_select(motif_seq, motif_mask)
-    # motif_pdb_seq = collater([(motif_pdb,)])['input_ids'][0][1:-1]
-    # assert motif_pdb_seq.equal(motif_seq)
     
     init_seq = []
     scaffold_length_list = []
@@ -212,8 +236,10 @@ def generate(args, saveto):
 
         if args.structure_enc:
             pdb_path = os.path.join('data-bin/scaffolding-pdbs/' + pdb + '_motif.pdb')
+            from byprot.datamodules.dataset.data_utils import Alphabet
+            alphabet = Alphabet()
             batch_struct, _ = prepare_data(
-                pdb_path, tokenizer, tokenizer.featurize, 
+                pdb_path, alphabet, alphabet.featurize, 
                 num_seqs=args.num_seqs, device=device
             )
             
@@ -227,8 +253,8 @@ def generate(args, saveto):
             batch_struct['motif_mask'] = partial_mask
             
             batch.update(batch_struct)
-            batch['prev_tokens'] = batch['input_ids']
-            print()
+            # batch['prev_tokens'] = batch['input_ids']
+            # print()
         
         with torch.cuda.amp.autocast():
             outputs = model.generate(batch=batch, temperature=args.temperature,

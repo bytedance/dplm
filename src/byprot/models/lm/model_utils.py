@@ -7,6 +7,7 @@ from byprot.models.lm.esm_dplm import EsmForDPLM
 from dataclasses import dataclass, field
 from transformers import AutoModelForMaskedLM, AutoConfig, AutoTokenizer
 import torch
+import os
 try:
     from peft import get_peft_model, LoraConfig, TaskType
 except:
@@ -18,6 +19,8 @@ class NetConfig:
     arch_type: str = "esm"
     name: str = "esm2_t33_650M_UR50D"
     dropout: float = 0.1
+    pretrain: bool = False
+    pretrained_model_name_or_path: str = ""
 
 @dataclass
 class LoRAConfig:
@@ -52,6 +55,22 @@ def get_net(cfg):
     else:
         raise NotImplementedError
     
+    # 2-stage training (please refer to our paper for more details.)
+    ## stage 1: pretrain a masked language model (MLM) from scratch
+    ## stage 2: continue pretrain a diffusion language model based on the pretrained MLM
+    if cfg.net.pretrain:
+        pretrained_model_name_or_path = cfg.net.pretrained_model_name_or_path
+        is_local = os.path.isdir(pretrained_model_name_or_path)
+        if is_local:
+            # load your pretrained MLM from local
+            state_dict = torch.load(pretrained_model_name_or_path, map_location='cpu')['state_dict']
+            net.load_state_dict(state_dict, strict=True)
+        else:
+            # or you can load a pretrained MLM from huggingface
+            ptrn_net = AutoModelForMaskedLM.from_pretrained(pretrained_model_name_or_path)
+            net.load_state_dict(ptrn_net.state_dict(), strict=True)
+            del ptrn_net
+            
     # activate lora training if possible
     if cfg.lora.lora:
         # QKVO, MLP

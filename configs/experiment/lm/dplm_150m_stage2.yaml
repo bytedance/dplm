@@ -6,7 +6,7 @@
 defaults:
   - /datamodule: uniref50
   - /callbacks: lm
-  - /trainer: ddp_bf16
+  - /trainer: ddp_fp16
 
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
@@ -35,6 +35,8 @@ model:
     arch_type: esm
     name: facebook/esm2_t30_150M_UR50D
     dropout: 0.1
+    pretrain: true
+    pretrained_model_name_or_path: facebook/esm2_t30_150M_UR50D
 
 task:
   _target_: lm/dplm
@@ -79,7 +81,7 @@ trainer:
   num_sanity_val_steps: 0
   reload_dataloaders_every_n_epochs: 1
   use_distributed_sampler: false
-  max_steps: 500_000
+  max_steps: 100_000
   accumulate_grad_batches: 1
   check_val_every_n_epoch: null
   val_check_interval: 1000

@@ -1,0 +1,93 @@
+setting:
+  seed: 20000812
+  ROOTDIR: './'
+  os_environ:
+    WANDB_API_KEY: ~
+    WANDB_RUN_ID: ~
+    CUDA_VISIBLE_DEVICES: 0,1,2,3,4,5,6,7
+    MASTER_ADDR: localhost
+    MASTER_PORT: 12315
+    WORLD_SIZE: 1
+    NODE_RANK: 0
+  wandb_config:
+    project: GO_MF
+    name: esm2_t33_650M_UR50D
+  tensorboard_config:
+    save_dir: "./tensorboard/"
+    name: GO_MF
+    version: GO_MF
+    log_graph: False
+    default_hp_metric: True
+    prefix: ""
+
+model_checkpoint:
+  monitor: "valid/valid_f1_max" # name of the logged metric which determines when model is improving
+  mode: "max" # "max" means higher metric value is better, can be also "min"
+  save_top_k: 1 # save k best models (determined by above metric)
+  save_last: True # additionaly always save model from last epoch
+  verbose: True
+  dirpath: ""
+  filename: "valid_f1_max_{valid/valid_f1_max:.5f}"
+  auto_insert_metric_name: False
+  every_n_train_steps: 0
+  every_n_epochs: 1
+  
+model:
+#    Which model to use
+  model_py_path: dplm/dplm_annotation_model
+  kwargs:
+#    Arguments to initialize the specific class
+    net_name: airkingbd/dplm_650m
+    load_pretrained: True
+    anno_type: GO_MF
+    load_prev_scheduler: True
+    save_top_k: 1
+
+    freeze_backbone: 0
+    dropout: 0.0
+    use_lora: 0
+
+#    Arguments to initialize the basic class AbstractModel
+  lr_scheduler_kwargs:
+    last_epoch: -1
+    init_lr: 2.0e-5
+#    Weather to use this scheduler or not
+    on_use: false
+
+  optimizer_kwargs:
+    betas: [0.9, 0.98]
+    weight_decay: 0.01
+
+  save_path: checkpoints/GO/MF_dplm_650m
+
+
+dataset:
+#    Arguments to initialize the basic class LMDBDataset
+  dataset_py_path: dplm/dplm_annotation_dataset
+  dataloader_kwargs:
+    batch_size: 1
+    num_workers: 8
+
+  train_lmdb: LMDB/GO/AF2/MF/normal/train
+  valid_lmdb: LMDB/GO/AF2/MF/normal/valid
+  test_lmdb: LMDB/GO/AF2/MF/normal/test
+#    Arguments to initialize the specific class
+  kwargs:
+    tokenizer: airkingbd/dplm_650m
+
+
+#  Arguments to initialize Pytorch Lightning Trainer
+Trainer:
+  max_epochs: 100
+  log_every_n_steps: 1
+  strategy:
+    find_unused_parameters: True
+  logger: False
+  #enable_checkpointing: false
+  val_check_interval: 1.0
+  accelerator: gpu
+  devices: 8
+  num_nodes: 1
+  accumulate_grad_batches: 1
+  precision: 16
+  num_sanity_val_steps: 0

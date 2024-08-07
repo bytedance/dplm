@@ -12,8 +12,8 @@ defaults:
 # this allows you to overwrite only specified parameters
 
 # name of the run determines folder name in logs
-project: "DPLM_150m"
-name: "dplm_150m"
+project: "DPLM_3b"
+name: "dplm_3b"
 
 datamodule:
   max_tokens: 6000
@@ -33,8 +33,10 @@ model:
     modules_to_save: lm_head,esm.embeddings
   net:
     arch_type: esm
-    name: facebook/esm2_t30_150M_UR50D
+    name: facebook/esm2_t36_3B_UR50D
     dropout: 0.1
+    pretrain: true
+    pretrained_model_name_or_path: facebook/esm2_t36_3B_UR50D
 
 task:
   _target_: lm/dplm
@@ -79,7 +81,7 @@ trainer:
   num_sanity_val_steps: 0
   reload_dataloaders_every_n_epochs: 1
   use_distributed_sampler: false
-  max_steps: 500_000
+  max_steps: 100_000
   accumulate_grad_batches: 1
   check_val_every_n_epoch: null
   val_check_interval: 1000

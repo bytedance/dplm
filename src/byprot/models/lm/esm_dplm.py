@@ -10,7 +10,7 @@ import torch.nn as nn
 from byprot.models import register_model
 from torch.nn import functional as F
 from typing import List, Optional, Tuple, Union
-
+from tqdm import tqdm
 from transformers.models.esm.modeling_esm import *
 from transformers import AutoConfig, AutoModelForMaskedLM, AutoTokenizer
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
@@ -235,6 +235,7 @@ class ModifiedEsmModel(EsmModel):
             cross_attentions=encoder_outputs.cross_attentions,
         )
 
+@register_model('mlm_esm')
 class EsmForDPLM(EsmForMaskedLM):
     def __init__(self, config, dropout=0.1):
         tokenizer = AutoTokenizer.from_pretrained(config._name_or_path)
@@ -299,7 +300,7 @@ class EsmForDPLM(EsmForMaskedLM):
         return non_special_sym_mask
     
     def initialize_output_tokens(self, batch, encoder_out, partial_masks=None, **kwargs):
-        tokens = batch['prev_tokens']
+        tokens = batch['input_ids']
         if tokens is None:
             raise NotImplementedError
         else:
@@ -309,3 +310,100 @@ class EsmForDPLM(EsmForMaskedLM):
             output_scores = torch.zeros_like(output_tokens, dtype=torch.float)
 
             return output_tokens, output_scores
+        
+    def forward_decoder(self, prev_decoder_out, encoder_out, need_attn_weights=False, partial_masks=None,
+                        sampling_strategy='argmax'):
+        output_tokens = prev_decoder_out['output_tokens'].clone()
+        output_scores = prev_decoder_out['output_scores'].clone()
+        step, max_step = prev_decoder_out['step'], prev_decoder_out['max_step']
+        temperature = prev_decoder_out['temperature']
+        history = prev_decoder_out['history']
+
+        output_masks = self.get_non_special_sym_mask(output_tokens, partial_masks=partial_masks)
+
+        esm_out = self.forward(
+            input_ids=output_tokens,
+        )
+        logits = esm_out['logits']
+
+        logits[..., self.mask_id] = -math.inf
+        logits[..., self.x_id] = -math.inf
+        
+        if sampling_strategy == 'argmax':
+            _scores, _tokens = logits.max(-1)
+        elif sampling_strategy == 'sample':
+            _tokens, _scores = sample_from_categorical(logits, temperature=temperature)
+        
+        output_tokens.masked_scatter_(output_masks, _tokens[output_masks])
+        output_scores.masked_scatter_(output_masks, _scores[output_masks])
+
+        history.append(output_tokens.clone())
+
+        return dict(
+            output_tokens=output_tokens,
+            output_scores=output_scores,
+            step=step + 1,
+            max_step=max_step,
+            history=history,
+        )
+        
+    def generate(self, batch, tokenizer=None, 
+                 max_iter=None, temperature=None, 
+                 partial_masks=None,
+                 sampling_strategy='gumbel_argmax'):
+        tokenizer = tokenizer 
+        max_iter = max_iter
+        temperature = temperature
+
+        # 0) encoding
+        encoder_out = self.forward_encoder(batch)
+        # 1) initialized from all mask tokens
+        initial_output_tokens, initial_output_scores = self.initialize_output_tokens(
+            batch, encoder_out=encoder_out, partial_masks=partial_masks)
+        prev_decoder_out = dict(
+            output_tokens=initial_output_tokens,
+            output_scores=initial_output_scores,
+            output_masks=None,
+            attentions=None,
+            step=0,
+            max_step=max_iter,
+            history=[initial_output_tokens.clone()],
+            temperature=temperature,
+        )
+
+        prev_decoder_out['output_masks'] = self.get_non_special_sym_mask(
+                prev_decoder_out['output_tokens'], partial_masks=partial_masks
+            )
+
+        for step in tqdm(range(max_iter), desc='Decoding'):
+            # predict
+            with torch.no_grad():
+                decoder_out = self.forward_decoder(
+                    prev_decoder_out=prev_decoder_out,
+                    encoder_out=encoder_out,
+                    partial_masks=partial_masks,
+                    sampling_strategy=sampling_strategy
+                )
+
+            output_tokens = decoder_out['output_tokens']
+            output_scores = decoder_out['output_scores']
+
+            prev_decoder_out.update(
+                output_tokens=output_tokens,
+                output_scores=output_scores,
+                step=step + 1,
+                history=decoder_out['history']
+            )
+
+        decoder_out = prev_decoder_out
+        return decoder_out['output_tokens'], decoder_out['output_scores']
+    
+
+def sample_from_categorical(logits=None, temperature=1.0):
+    if temperature:
+        dist = torch.distributions.Categorical(logits=logits.div(temperature))
+        tokens = dist.sample()
+        scores = dist.log_prob(tokens)
+    else:
+        scores, tokens = logits.log_softmax(dim=-1).max(dim=-1)
+    return tokens, scores

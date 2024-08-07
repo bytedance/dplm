@@ -52,7 +52,7 @@ class DiffusionProteinLanguageModel(nn.Module):
             self.net.gradient_checkpointing_enable()
     
     @classmethod
-    def from_pretrained(cls, net_name, **kwargs):
+    def from_pretrained(cls, net_name, cfg_override={}, net_override={}):
         if os.path.exists(net_name):
             # Load model checkpoint from local if you pretrain a DPLM by yourself
             # The net_name should be like:
@@ -68,19 +68,20 @@ class DiffusionProteinLanguageModel(nn.Module):
             cfg.pop('_target_')
             model = cls(cfg)
             
-            pretrained_state_dict = torch.load(net_name, map_location=torch.device("cpu"))['module']
+            pretrained_state_dict = torch.load(net_name, map_location=torch.device("cpu"))['state_dict']
             new_pretrained_state_dict = OrderedDict()
             
+            # remove the module prefix "model."
             for k, v in pretrained_state_dict.items():
                 new_pretrained_state_dict[k[6:]] = v
             model.load_state_dict(new_pretrained_state_dict, strict=False) 
             return model
         else:
+            # Load DPLM model checkpoint from huggingface
             net_type = AutoConfig.from_pretrained(net_name).model_type
             net_class = get_net_class(net_type)
-            net = net_class.from_pretrained(net_name)
-            cfg = kwargs
-            return cls(cfg, net=net)
+            net = net_class.from_pretrained(net_name, **net_override)
+            return cls(cfg=cfg_override, net=net)
     
     def _update_cfg(self, cfg):
         # if '_target_' in cfg.net:
@@ -123,12 +124,16 @@ class DiffusionProteinLanguageModel(nn.Module):
             "mask_mask": t1_mask,
         }
         
-    def forward(self, input_ids, **kwargs):
+    def forward(self, input_ids, return_last_hidden_state=False, **kwargs):
         outputs = self.net(
             input_ids=input_ids,
         )
         logits = outputs['logits']
-        return logits
+        if return_last_hidden_state:
+            last_hidden_state = outputs['last_hidden_state']
+            return logits, last_hidden_state
+        else:
+            return logits
 
     def compute_loss(self, batch, weighting='constant'):
         target = batch['targets']

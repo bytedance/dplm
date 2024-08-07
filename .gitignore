@@ -158,7 +158,7 @@ run/logs
 *.pdb
 
 byprot-checkpoints/
-data-bin/
+# data-bin/
 generation-results/
 temp.ipynb
 run/

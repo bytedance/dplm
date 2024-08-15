@@ -131,7 +131,7 @@ We examine 17 motif-scaffolding problems, and for each problem, we sample 100 se
 | ------------ | ----- | -------- | ---- | -------- | -------- | -------- | ---- | -------- | -------- | ---- | ---- | -------- | -------- | -------- | -------- | ---- | -------- |
 | Success rate | **1** | **0.95** | 0    | **0.54** | **0.11** | **0.17** | 0    | **0.02** | **0.03** | 0    | 0    | **0.01** | **0.43** | **0.86** | **0.01** | 0    | **0.25** |
 
-We provide the following script to sample sequences for each motif-scaffolding problem,
+We provide the following script to sample sequences for each motif-scaffolding problem. Note that before generation, you should download all the motif pdb files which are provided by [EvoDiff](https://github.com/microsoft/evodiff/tree/main/examples/scaffolding-pdbs), and place them in the data-bin/scaffolding-pdbs folder.
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0

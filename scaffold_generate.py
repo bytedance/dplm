@@ -166,17 +166,17 @@ def get_motif(PDB_ID):
         spacers=[0]
     print("motif extracted from indexes supplied:", motif)
     
-    pdb_motif_path = os.path.join('data-bin/scaffolding-pdbs/' + str(PDB_ID) + '_motif.pdb')
-    structure_motif = esm.inverse_folding.util.load_structure(pdb_motif_path, chain_ids)
-    _, native_seqs_motif = esm.inverse_folding.multichain_util.extract_coords_from_complex(structure_motif)
-    motif_pdb = native_seqs_motif[chain_ids[0]]
-    print("motif extracted from motif.pdb:", motif_pdb)
-    return motif, motif_pdb
+    # pdb_motif_path = os.path.join('data-bin/scaffolding-pdbs/' + str(PDB_ID) + '_motif.pdb')
+    # structure_motif = esm.inverse_folding.util.load_structure(pdb_motif_path, chain_ids)
+    # _, native_seqs_motif = esm.inverse_folding.multichain_util.extract_coords_from_complex(structure_motif)
+    # motif_pdb = native_seqs_motif[chain_ids[0]]
+    # print("motif extracted from motif.pdb:", motif_pdb)
+    return motif
 
 
 def get_initial(args, tokenizer, pdb, min_len, max_len, device):
     num = args.num_seqs
-    motif, motif_pdb = get_motif(pdb)
+    motif = get_motif(pdb)
     
     mask = tokenizer.mask_token_id
     bos = tokenizer.cls_token_id

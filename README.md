@@ -50,7 +50,6 @@ task=EC
 
 config=config/${task}/dplm.yaml
 save_path=./checkpoints/${task}_dplm_650m/best.ckpt
-tensorboard_dir=./tensorboard/${task}_dplm_650m
 
 python scripts/testing.py --config ${config} \
     --model.save_path ${save_path} \
@@ -67,7 +66,6 @@ task=EC
 config=config/${task}/dplm.yaml
 save_path=./checkpoints/${task}_dplm_650m/EC_dplm_650m.ckpt
 # The "EC_dplm_650m.ckpt" is downloaded from huggingface
-tensorboard_dir=./tensorboard/${task}_dplm_650m
 
 python scripts/testing.py --config ${config} \
     --model.save_path ${save_path} \

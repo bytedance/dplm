@@ -29,7 +29,7 @@ def run(config):
             # model = load_model(config.model)
             trainer.test(model=model, datamodule=data_module, ckpt_path=os.path.join(model.save_path, 'best.ckpt'))
         else:
-            model.load_checkpoint(os.path.join(model.save_path, 'valid_acc_0.76958.ckpt'))
+            model.load_checkpoint(model.save_path)
             trainer.test(model=model, datamodule=data_module)
 
 

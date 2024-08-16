@@ -52,11 +52,12 @@ class DiffusionProteinLanguageModel(nn.Module):
             self.net.gradient_checkpointing_enable()
     
     @classmethod
-    def from_pretrained(cls, net_name, cfg_override={}, net_override={}):
-        if os.path.exists(net_name):
-            # Load model checkpoint from local if you pretrain a DPLM by yourself
+    def from_pretrained(cls, net_name, cfg_override={}, net_override={}, from_huggingface=True):
+        if not from_huggingface:
+            # Load model checkpoint from local if you pretrain a DPLM with this repo
             # The net_name should be like:
             # ${name}/checkpoints/last.ckpt
+            # and there should be .hydra/config.yaml in the ${name} directory that is automatically generated during training.
             from byprot.utils.config import load_yaml_config
             from pathlib import Path
             from collections import OrderedDict

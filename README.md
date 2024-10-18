@@ -22,6 +22,10 @@ We develop DPLM based on the [ByProt](https://github.com/BytedProtein/ByProt). T
 
 ![DPLM](./assets/main.png)
 
+
+### News
+- **2024/10/18**: check out our new work [DPLM-2](https://bytedance.github.io/dplm/dplm-2), a multimodal protein foundation model that extends DPLM to simultaneously model, understand, and generate both sequences and structures!
+
 ## Installation
 
 ```bash

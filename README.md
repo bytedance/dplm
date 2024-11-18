@@ -20,6 +20,8 @@ We develop DPLM based on the [ByProt](https://github.com/BytedProtein/ByProt). T
 - **Controllable generation**:
   DPLM enjoys plug-and-play programmability, generating samples satisfying provided secondary structure annotations.
 
+If you have any questions, please feel free to raise an issue or contact us at wangxinyou@smail.nju.edu.cn. Thank you!
+
 ![DPLM](./assets/main.png)
 
 ## Installation

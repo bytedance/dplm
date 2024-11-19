@@ -38,7 +38,7 @@ class DiffusionProteinLanguageModel(nn.Module):
         super().__init__()
         self._update_cfg(cfg)
         
-        self.net = get_net(cfg) if net is None else net
+        self.net = get_net(self.cfg) if net is None else net
         self.tokenizer = self.net.tokenizer
 
         self.mask_id = self.net.mask_id

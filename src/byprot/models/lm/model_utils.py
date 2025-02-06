@@ -60,7 +60,7 @@ def get_net(cfg):
     ## stage 2: continue pretrain a diffusion language model based on the pretrained MLM
     if cfg.net.pretrain:
         pretrained_model_name_or_path = cfg.net.pretrained_model_name_or_path
-        is_local = os.path.isdir(pretrained_model_name_or_path)
+     	is_local = os.path.isfile(pretrained_model_name_or_path)
         if is_local:
             # load your pretrained MLM from local
             state_dict = torch.load(pretrained_model_name_or_path, map_location='cpu')['state_dict']

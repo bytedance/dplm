@@ -71,79 +71,6 @@ class SortishSampler(Sampler):
     def set_epoch(self, epoch):
         self.epoch = epoch
 
-# class ApproxBatchSampler(BatchSampler):
-#     """
-#     Parameters:
-#     -----------
-#     sampler : Pytorch Sampler
-#             Choose base sampler class to use for bucketing
-
-#     max_tokens : int
-#             Maximum number of tokens per batch
-
-#     max_batch: int
-#             Maximum batch size
-
-#     sample_lengths : array-like
-#             List of lengths of sequences in the order of the dataset
-#     """
-
-#     def __init__(
-#         self,
-#         sampler,
-#         max_tokens,
-#         max_batch,
-#         sample_lengths,
-#         max_square_tokens=np.inf,
-#         msa_depth=None,
-#         drop_last=False,
-#         batch_size=None,
-#         max_len=512
-#     ):
-#         super().__init__(sampler, max_batch, drop_last)
-#         self.longest_token = 0
-#         self.max_tokens = max_tokens
-#         self.max_batch = max_batch
-#         self.sampler = sampler
-#         self.sample_lengths = sample_lengths
-#         self.max_square_tokens = max_square_tokens
-#         self.msa_depth = msa_depth
-#         self.drop_last
-#         self.max_len = max_len
-
-#     def __iter__(self):
-#         batch = []
-#         length = 0
-#         ell_sq = 0
-#         for i, idx in enumerate(self.sampler):
-#             this_length = min(self.max_len, self.sample_lengths[idx])
-#             if self.msa_depth is None:
-#                 linear = (len(batch) + 1) * max(length, this_length)
-#             else:
-#                 max_len = max(length, this_length)
-#                 linear = (len(batch) + 1) * (
-#                     max_len * self.msa_depth**2 + max_len**2 * self.msa_depth
-#                 )
-#             quadratic = (len(batch) + 1) * max(ell_sq, this_length**2)
-#             if linear <= self.max_tokens and quadratic < self.max_square_tokens:
-#                 batch.append(idx)
-#                 length = max(length, this_length)
-#                 ell_sq = max(ell_sq, this_length**2)
-#                 if len(batch) == self.max_batch:
-#                     yield batch
-#                     batch = []
-#                     length = 0
-#             else:
-#                 if len(batch) == 0:
-#                     print('Current batch is empty! idx is ', idx)
-#                     continue
-#                 yield batch
-#                 batch = [idx]
-#                 length = this_length
-#                 ell_sq = this_length**2
-#         if len(batch) > 0:
-#             yield batch
-
 class ApproxBatchSampler(BatchSampler):
     """
     Parameters:
@@ -281,29 +208,6 @@ class UniRefDataset(Dataset):
             stop = len(consensus)
         consensus = consensus[start:stop]
         return consensus
-
-class UniRefDatasetForTesting(Dataset):
-    def __init__(
-        self,
-        max_len=2048,
-        num_seqs=40,
-    ):
-        # self.max_len = max_len
-        self.indices = []
-        self.metadata_lens = []
-        for i in range(1, 11):
-            self.indices += ['A' * 100 * i] * num_seqs
-            self.metadata_lens += [100 * i] * num_seqs
-
-    def __len__(self):
-        return len(self.indices)
-
-    def get_metadata_lens(self):
-        return self.metadata_lens
-    
-    def __getitem__(self, idx):
-        consensus = self.indices[idx]
-        return (consensus,)
 
 class Subset(Dataset[T_co]):
     r"""

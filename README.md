@@ -111,7 +111,7 @@ The results of unconditional protein sequence generation of DPLM of different sc
 | 650M   | 74.00 (+0.69) | 85.61 (+1.31) | 85.91 (+1.09) | 88.16 (+1.26) | 82.58 (+0.87) | 84.38 (+2.85) | 83.87 (+2.31) | 83.00 (+2.08) | 84.92  (+6.21) | 81.51  (+9.41) |
 | 3B     | 77.78 (+4.47) | 86.16 (+1.86) | 87.39 (+2.57) | 90.06 (+3.16) | 87.43 (+5.72) | 86.01 (+4.48) | 84.64 (+3.08) | 85.88 (+4.96) | 85.93 (+7.22)  | 83.86 (+11.76) |
 
-To generate new protein sequences using a pre-trained DPLM model:
+To generate new protein sequences using a pre-trained DPLM model, and evaluate with ESMFold:
 
 ```bash
 model_name=dplm_650m # choose from dplm_150m, dplm_650m, dplm_3b
@@ -217,10 +217,10 @@ eval_sc=false
 # TMscore and pLDDT during generation, 
 # thus siginificantly increase the evaluation time.
 
-python test.py \                                                                 
+python test.py \
     experiment_path=${exp_path} \
     data_split=test ckpt_path=best.ckpt mode=predict \
-    task.generator.max_iter=100 task.generator.eval_sc=${eval_sc}
+    +task.generator.max_iter=100 +task.generator.eval_sc=${eval_sc}
 ```
 
 ## Representation Learning

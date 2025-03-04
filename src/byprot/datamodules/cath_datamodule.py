@@ -1,4 +1,3 @@
-
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
@@ -19,26 +18,25 @@ from byprot.datamodules.dataset.data_utils import Alphabet, MaxTokensBatchSample
 log = utils.get_logger(__name__)
 
 
-# @register_datamodule('struct2seq')
-@register_datamodule('cath')
+@register_datamodule("cath")
 class CATHDataModule(LightningDataModule):
 
     def __init__(
         self,
         data_dir: str = "data/",
-        chain_set_jsonl: str = 'chain_set.jsonl',
-        chain_set_splits_json: str = 'chain_set_splits.json',
+        chain_set_jsonl: str = "chain_set.jsonl",
+        chain_set_splits_json: str = "chain_set_splits.json",
         max_length: int = 500,
-        atoms: List[str] = ('N', 'CA', 'C', 'O'),
+        atoms: List[str] = ("N", "CA", "C", "O"),
         alphabet=None,
         batch_size: int = 64,
         max_tokens: int = 6000,
         sort: bool = False,
         num_workers: int = 0,
         pin_memory: bool = False,
-        train_split: str = 'train',
-        valid_split: str = 'valid',
-        test_split: str = 'test',
+        train_split: str = "train",
+        valid_split: str = "valid",
+        test_split: str = "test",
         filter_nan: bool = False,
     ):
         super().__init__()
@@ -61,7 +59,7 @@ class CATHDataModule(LightningDataModule):
         """
 
         # load datasets only if they're not loaded already
-        if stage == 'fit':
+        if stage == "fit":
             (train, valid), alphabet = CATH(
                 self.hparams.data_dir,
                 chain_set_jsonl=self.hparams.chain_set_jsonl,
@@ -71,12 +69,12 @@ class CATHDataModule(LightningDataModule):
             )
             self.train_dataset = train
             self.valid_dataset = valid
-        elif stage == 'test' or stage == 'predict':
+        elif stage == "test" or stage == "predict":
             test, alphabet = CATH(
                 self.hparams.data_dir,
                 chain_set_jsonl=self.hparams.chain_set_jsonl,
                 chain_set_splits_json=self.hparams.chain_set_splits_json,
-                split=(self.hparams.test_split, ),
+                split=(self.hparams.test_split,),
                 filter_nan=self.hparams.filter_nan,
             )
             self.test_dataset = test
@@ -87,7 +85,9 @@ class CATHDataModule(LightningDataModule):
 
         self.collate_batch = self.alphabet.featurizer
 
-    def _build_batch_sampler(self, dataset, max_tokens, shuffle=False, distributed=True):
+    def _build_batch_sampler(
+        self, dataset, max_tokens, shuffle=False, distributed=True
+    ):
         is_distributed = distributed and torch.distributed.is_initialized()
 
         batch_sampler = MaxTokensBatchSampler(
@@ -98,40 +98,43 @@ class CATHDataModule(LightningDataModule):
             max_tokens=max_tokens,
             sort=self.hparams.sort,
             drop_last=False,
-            sort_key=lambda i: len(dataset[i]['seq']))
+            sort_key=lambda i: len(dataset[i]["seq"]),
+        )
         return batch_sampler
 
     def train_dataloader(self):
-        if not hasattr(self, 'train_batch_sampler'):
+        if not hasattr(self, "train_batch_sampler"):
             self.train_batch_sampler = self._build_batch_sampler(
-                self.train_dataset,
-                max_tokens=self.hparams.max_tokens,
-                shuffle=True
+                self.train_dataset, max_tokens=self.hparams.max_tokens, shuffle=True
             )
         return DataLoader(
             dataset=self.train_dataset,
             batch_sampler=self.train_batch_sampler,
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
-            collate_fn=self.collate_batch
+            collate_fn=self.collate_batch,
         )
 
     def val_dataloader(self):
         return DataLoader(
             dataset=self.valid_dataset,
             batch_sampler=self._build_batch_sampler(
-                self.valid_dataset, max_tokens=self.hparams.max_tokens, distributed=False),
+                self.valid_dataset,
+                max_tokens=self.hparams.max_tokens,
+                distributed=False,
+            ),
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
-            collate_fn=self.collate_batch
+            collate_fn=self.collate_batch,
         )
 
     def test_dataloader(self):
         return DataLoader(
             dataset=self.test_dataset,
             batch_sampler=self._build_batch_sampler(
-                self.test_dataset, max_tokens=self.hparams.max_tokens, distributed=False),
+                self.test_dataset, max_tokens=self.hparams.max_tokens, distributed=False
+            ),
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
-            collate_fn=self.collate_batch
+            collate_fn=self.collate_batch,
         )

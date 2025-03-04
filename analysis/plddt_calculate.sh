@@ -15,8 +15,6 @@ pdb_path=$output_dir/esmfold_pdb
 mkdir -p $pdb_path
 
 echo 'folding by ESMFold'
-python cal_plddt_dir.py -i ${output_dir} -o ${pdb_path} --max-tokens-per-batch ${max_tokens} \
-	-m ${ROOTDIR}/cache-dir
+python analysis/cal_plddt_dir.py -i ${output_dir} -o ${pdb_path} --max-tokens-per-batch ${max_tokens}
 
 echo "============================Finish Evaluation=============================="
-

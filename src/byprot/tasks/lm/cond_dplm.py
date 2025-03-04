@@ -16,15 +16,10 @@ from byprot.utils.config import compose_config as Cfg, merge_config
 
 from omegaconf import DictConfig
 from byprot.datamodules.dataset.data_utils import Alphabet
-from torch import distributed as dist
 from torch import nn
-from torch.nn import functional as F
-from torchmetrics import CatMetric, MaxMetric, MeanMetric, MinMetric, SumMetric
-import random
-from byprot.modules.cross_entropy import label_smoothed_nll_loss
+from torchmetrics import CatMetric, MaxMetric, MeanMetric, MinMetric
 from copy import deepcopy
 
-# from byprot.task.fix.cmlm import CMLM
 
 log = utils.get_logger(__name__)
 
@@ -130,12 +125,6 @@ class ConditionalDPLMTrainingTask(TaskLitModule):
             default_cfg=self._DEFAULT_CFG.generator,
             override_cfg=self.hparams.generator
         )
-        # from byprot.models.lm.generator import IterativeRefinementGenerator
-
-        # self.generator = IterativeRefinementGenerator(
-        #     alphabet=self.alphabet,
-        #     **self.hparams.generator
-        # )
         log.info(f"Generator config: {self.hparams.generator}")
 
     def build_criterion(self):
@@ -288,11 +277,8 @@ class ConditionalDPLMTrainingTask(TaskLitModule):
 
     @torch.cuda.amp.custom_fwd(cast_inputs=torch.float32)
     def eval_self_consistency(self, pred_ids, positions, mask=None):
-        from esm.esmfold.v1.misc import output_to_pdb
-
         import byprot.modules.protein_metrics as pmetrics
 
-        # positions, pred_ids = tensor_to_list(positions, pred_ids, mask)
         pred_seqs = decode(pred_ids, self.alphabet, remove_special=True)
 
         # run_folding:
@@ -300,31 +286,8 @@ class ConditionalDPLMTrainingTask(TaskLitModule):
         sc_rmsds = []
         plddts = []
         with torch.no_grad():
-            # with torch.autocast()
             output = self._folding_model.infer(sequences=pred_seqs)
-            # pred_seqs = decode(output["aatype"], self.alphabet, remove_special=True)
-
-            # positions = positions.to(torch.float64)
-            # output["positions"] = output["positions"].clone().to(torch.float64)
-            # pred_pdbs = output_to_pdb(output)
-
-            # output["positions"] = output["positions"].clone()
-            # for i in range(positions.shape[0]):
-            #     pred_seq = pred_seqs[i]
-            #     seqlen = len(pred_seq)
-            #     output["positions"][-1, i, :seqlen, :3, :] = positions[
-            #         i, 1 : seqlen + 1, :3, :
-            #     ]
-            # true_pdbs = output_to_pdb(output)
-
-            # for pred_pdb_str, true_pdb_str in zip(pred_pdbs, true_pdbs):
-            #     sc_tmscore = calc_tm_score(pred_pdb_str, true_pdb_str)
-            #     sc_tmscores.append(sc_tmscore)
-
             positions = positions.cpu()
-            nan_mask = positions.isnan()
-            # positions[nan_mask] = 0.0
-
             folded_positions = output["positions"][-1].cpu()
             CA_idx = 1
             for i in range(positions.shape[0]):
@@ -335,20 +298,14 @@ class ConditionalDPLMTrainingTask(TaskLitModule):
                     folded_positions[i, :seqlen, :3, :],
                     pred_seq,
                     pred_seq,
-                    # ~nan_mask[i, 1 : seqlen + 1, CA_idx, 0] 
                     mask[i, 1 : seqlen + 1].cpu()
                 )
                 sc_tmscores.append(sc_tmscore)
 
-                # sc_rmsd = pmetrics.calc_aligned_rmsd(
-                #     positions[i, 1 : seqlen + 1, 1, :],
-                #     folded_positions[i, :seqlen, 1, :],
-                # )
                 from openfold.utils.superimposition import superimpose
                 _, sc_rmsd = superimpose(
                     positions[i, 1 : seqlen + 1, CA_idx, :][None],
                     folded_positions[i, :seqlen, CA_idx, :][None],
-                    # ~nan_mask[i, 1 : seqlen + 1, CA_idx, 0][None],
                     mask[i, 1 : seqlen + 1].cpu()
                 )
                 sc_rmsds.append(sc_rmsd[0].item())
@@ -447,8 +404,6 @@ class ConditionalDPLMTrainingTask(TaskLitModule):
         if self.stage == "test":
             self.test_step_outputs.append(results)
             
-        # return results
-
     def on_predict_epoch_end(self) -> None:
         log_key = "test" if self.stage == "test" else "val"
 
@@ -498,8 +453,6 @@ class ConditionalDPLMTrainingTask(TaskLitModule):
             with open('./result.txt', 'w') as f:
                 f.write(f'acc: {acc}')
                 f.write(f'acc_median: {acc_median}')
-                # if self.hparams.generator.eval_sc:
-                #     f.write(f'sc_tmscores: {sc_tmscores}')
         
     def save_prediction(self, results, saveto=None):
         save_dict = {}

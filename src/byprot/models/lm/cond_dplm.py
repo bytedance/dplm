@@ -1,4 +1,3 @@
-
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
@@ -10,15 +9,23 @@ import torch.nn as nn
 from byprot import utils
 from byprot.models import register_model
 import math
-from byprot.models.lm.model_utils import topk_masking, stochastic_sample_from_categorical
-from byprot.models.lm.modules.dplm_adapter import DPLMWithConditionalAdatper, DPLMWithAdapterConfig
+from byprot.models.lm.model_utils import (
+    topk_masking,
+    stochastic_sample_from_categorical,
+)
+from byprot.models.lm.modules.dplm_adapter import (
+    DPLMWithConditionalAdatper,
+    DPLMWithAdapterConfig,
+)
 import numpy as np
 from tqdm import tqdm
-    
+
+
 @dataclass
 class GVPTransEncoderConfig:
     output_logits: bool = False
     d_model: int = 512
+
 
 @dataclass
 class ConditionalDPLMConfig:
@@ -26,14 +33,15 @@ class ConditionalDPLMConfig:
     decoder: DPLMWithAdapterConfig = field(default=DPLMWithAdapterConfig())
     init_pred_where: bool = True
 
-@register_model('cond_dplm')
+
+@register_model("cond_dplm")
 class ConditionalDPLM(nn.Module):
     _default_cfg = ConditionalDPLMConfig()
 
     def __init__(self, cfg) -> None:
         super().__init__()
-        
-        self.encoder = utils.instantiate_from_config(cfg=cfg.encoder, group='model')
+
+        self.encoder = utils.instantiate_from_config(cfg=cfg.encoder, group="model")
         self.decoder = DPLMWithConditionalAdatper.from_pretrained(cfg=cfg.decoder)
 
         self._update_cfg(cfg)
@@ -45,26 +53,71 @@ class ConditionalDPLM(nn.Module):
         self.init_pred_where = self.cfg.init_pred_where
 
     def _update_cfg(self, cfg):
-        if '_target_' in cfg.encoder:
-            cfg.encoder.pop('_target_')
+        if "_target_" in cfg.encoder:
+            cfg.encoder.pop("_target_")
         self.cfg = OmegaConf.merge(self._default_cfg, cfg)
-        
-    def forward(self, batch, weighting='linear', return_outputs=True, output_encoder_logits=False, **kwargs):
+
+    @classmethod
+    def from_pretrained(cls, net_name, cfg_override={}, net_override={}):
+        # Load model checkpoint from local if you pretrain a structure-condition DPLM with this repo
+        # The net_name should be like:
+        # ${name}/checkpoints/last.ckpt
+        # and there should be .hydra/config.yaml in the ${name} directory that is automatically generated during training.
+        from byprot.utils.config import load_yaml_config
+        from pathlib import Path
+        from collections import OrderedDict
+
+        cfg_path = Path(net_name).parents[1]
+        cfg_path = Path(cfg_path, ".hydra", "config.yaml")
+        cfg = load_yaml_config(str(cfg_path)).model
+        cfg.pop("_target_")
+        model = cls(cfg)
+
+        pretrained_state_dict = torch.load(net_name, map_location=torch.device("cpu"))[
+            "state_dict"
+        ]
+        new_pretrained_state_dict = OrderedDict()
+
+        # remove the module prefix "model."
+        for k, v in pretrained_state_dict.items():
+            new_pretrained_state_dict[k[6:]] = v
+        missing, unexpected = model.load_state_dict(
+            new_pretrained_state_dict, strict=False
+        )
+        print(
+            f"Restored from {net_name} with {len(missing)} missing and {len(unexpected)} unexpected keys"
+        )
+        if len(missing) > 0:
+            print(f"Missing Keys: {missing}")
+            print(f"Unexpected Keys: {unexpected}")
+        return model
+
+    def forward(
+        self,
+        batch,
+        weighting="linear",
+        return_outputs=True,
+        output_encoder_logits=False,
+        **kwargs,
+    ):
         encoder_logits = None
         if output_encoder_logits:
-            encoder_logits, encoder_out = self.encoder(batch, output_logits=True, **kwargs)
+            encoder_logits, encoder_out = self.encoder(
+                batch, output_logits=True, **kwargs
+            )
         else:
             encoder_out = self.encoder(batch, output_logits=False, **kwargs)
-        
-        encoder_out['feats'] = encoder_out['feats'].repeat(2, 1, 1).detach()
-        
-        encoder_out['encoder_attention_mask'] = batch['tokens'].ne(self.pad_id)
-        encoder_out['encoder_attention_mask'] = encoder_out['encoder_attention_mask'].repeat(2, 1)
+
+        encoder_out["feats"] = encoder_out["feats"].repeat(2, 1, 1).detach()
+
+        encoder_out["encoder_attention_mask"] = batch["tokens"].ne(self.pad_id)
+        encoder_out["encoder_attention_mask"] = encoder_out[
+            "encoder_attention_mask"
+        ].repeat(2, 1)
         if encoder_logits is not None:
             init_pred = encoder_logits.argmax(-1)
             if self.init_pred_where:
-                # init_pred = torch.where(batch['coord_mask'], init_pred, batch['prev_tokens'])
-                init_pred = torch.where(batch['coord_mask'], init_pred, batch['tokens'])
+                init_pred = torch.where(batch["coord_mask"], init_pred, batch["tokens"])
 
         logits, target, loss_mask, weight = self.decoder.compute_loss(
             batch=batch,
@@ -74,69 +127,91 @@ class ConditionalDPLM(nn.Module):
             return_outputs=return_outputs,
         )
 
-        return logits, target, loss_mask, weight, encoder_logits.repeat(2, 1, 1) if output_encoder_logits else None
+        return (
+            logits,
+            target,
+            loss_mask,
+            weight,
+            encoder_logits.repeat(2, 1, 1) if output_encoder_logits else None,
+        )
 
     def forward_encoder(self, batch, use_draft_seq=False):
         encoder_logits = None
         encoder_out = None
         if use_draft_seq:
-            encoder_logits, encoder_out = self.encoder(batch, return_feats=True, output_logits=True)
+            encoder_logits, encoder_out = self.encoder(
+                batch, return_feats=True, output_logits=True
+            )
             init_pred = encoder_logits.argmax(-1)
             if self.init_pred_where:
-                init_pred = torch.where(batch['coord_mask'], init_pred, batch['prev_tokens'])
-            encoder_out['logits'] = encoder_logits
-            encoder_out['init_pred'] = init_pred
+                init_pred = torch.where(
+                    batch["coord_mask"], init_pred, batch["prev_tokens"]
+                )
+            encoder_out["logits"] = encoder_logits
+            encoder_out["init_pred"] = init_pred
         else:
             encoder_out = self.encoder(batch, return_feats=True, output_logits=False)
-            encoder_out['coord_mask'] = batch['coord_mask']
-        #encoder_out['encoder_attention_mask'] = batch['prev_tokens'].ne(self.pad_id)
-        encoder_out['encoder_attention_mask'] = batch['motif_mask'] if 'motif_mask' in batch else batch['prev_tokens'].ne(self.pad_id)
+            encoder_out["coord_mask"] = batch["coord_mask"]
+        encoder_out["encoder_attention_mask"] = (
+            batch["motif_mask"]
+            if "motif_mask" in batch
+            else batch["prev_tokens"].ne(self.pad_id)
+        )
         return encoder_out
 
     def get_non_special_sym_mask(self, output_tokens, partial_masks=None):
         non_special_sym_mask = (
-            output_tokens.ne(self.pad_id) &
-            output_tokens.ne(self.bos_id) &
-            output_tokens.ne(self.eos_id)
+            output_tokens.ne(self.pad_id)
+            & output_tokens.ne(self.bos_id)
+            & output_tokens.ne(self.eos_id)
         )
         if partial_masks is not None:
-            non_special_sym_mask &= (~partial_masks)
+            non_special_sym_mask &= ~partial_masks
         return non_special_sym_mask
-               
-    def forward_decoder(self, prev_decoder_out, encoder_out, need_attn_weights=False, partial_masks=None,
-                        sampling_strategy='gumbel_argmax'):
-        output_tokens = prev_decoder_out['output_tokens'].clone()
-        output_scores = prev_decoder_out['output_scores'].clone()
-        step, max_step = prev_decoder_out['step'], prev_decoder_out['max_step']
-        temperature = prev_decoder_out['temperature']
-        history = prev_decoder_out['history']
 
-        # output_masks = output_tokens.eq(self.mask_id)  # & coord_mask
-        output_masks = self.get_non_special_sym_mask(output_tokens, partial_masks=partial_masks)
+    def forward_decoder(
+        self,
+        prev_decoder_out,
+        encoder_out,
+        need_attn_weights=False,
+        partial_masks=None,
+        sampling_strategy="gumbel_argmax",
+    ):
+        output_tokens = prev_decoder_out["output_tokens"].clone()
+        output_scores = prev_decoder_out["output_scores"].clone()
+        step, max_step = prev_decoder_out["step"], prev_decoder_out["max_step"]
+        temperature = prev_decoder_out["temperature"]
+        history = prev_decoder_out["history"]
+
+        output_masks = self.get_non_special_sym_mask(
+            output_tokens, partial_masks=partial_masks
+        )
 
         esm_out = self.decoder(
             batch={
-                'prev_tokens':output_tokens,
+                "prev_tokens": output_tokens,
             },
             encoder_out=encoder_out,
-            need_head_weights=need_attn_weights
+            need_head_weights=need_attn_weights,
         )
-        esm_logits = esm_out['logits']
-        attentions = esm_out['attentions'] if need_attn_weights else None
+        esm_logits = esm_out["logits"]
+        attentions = esm_out["attentions"] if need_attn_weights else None
 
-        logits = esm_logits  # + encoder_out['logits']
+        logits = esm_logits
 
         logits[..., self.mask_id] = -math.inf
         logits[..., self.x_id] = -math.inf
         logits[..., self.pad_id] = -math.inf
         logits[..., self.bos_id] = -math.inf
         logits[..., self.eos_id] = -math.inf
-        
-        if sampling_strategy == 'argmax':
+
+        if sampling_strategy == "argmax":
             _scores, _tokens = logits.max(-1)
-        elif sampling_strategy == 'gumbel_argmax':
+        elif sampling_strategy == "gumbel_argmax":
             noise_scale = 1.0
-            _tokens, _scores = stochastic_sample_from_categorical(logits, temperature=0.0, noise_scale=noise_scale)
+            _tokens, _scores = stochastic_sample_from_categorical(
+                logits, temperature=0.0, noise_scale=noise_scale
+            )
 
         output_tokens.masked_scatter_(output_masks, _tokens[output_masks])
         output_scores.masked_scatter_(output_masks, _scores[output_masks])
@@ -146,31 +221,42 @@ class ConditionalDPLM(nn.Module):
         return dict(
             output_tokens=output_tokens,
             output_scores=output_scores,
-            attentions=attentions, # [B, L, H, T, T]
+            attentions=attentions,  # [B, L, H, T, T]
             step=step + 1,
             max_step=max_step,
             history=history,
-            hidden_states=esm_out['last_hidden_state']
+            hidden_states=esm_out["last_hidden_state"],
         )
 
-    def initialize_output_tokens(self, batch, encoder_out, partial_masks=None, use_draft_seq=False, length_beam=1, mbr=1):
-        mask = encoder_out.get('coord_mask', None)
+    def initialize_output_tokens(
+        self,
+        batch,
+        encoder_out,
+        partial_masks=None,
+        use_draft_seq=False,
+        length_beam=1,
+        mbr=1,
+    ):
+        mask = encoder_out.get("coord_mask", None)
 
         if use_draft_seq:
-            prev_tokens = batch['prev_tokens']
-            prev_token_mask = batch['prev_token_mask']
+            prev_tokens = batch["prev_tokens"]
+            prev_token_mask = batch["prev_token_mask"]
             initial_output_tokens = torch.where(
-                prev_token_mask, encoder_out['init_pred'], prev_tokens)
+                prev_token_mask, encoder_out["init_pred"], prev_tokens
+            )
             initial_output_scores = torch.zeros(
                 *initial_output_tokens.size(), device=initial_output_tokens.device
             )
         else:
-            tokens = batch['prev_tokens']
+            tokens = batch["prev_tokens"]
             if tokens is None:
                 raise NotImplementedError
             else:
                 assert length_beam == 1 and mbr == 1
-                output_mask = self.get_non_special_sym_mask(tokens, partial_masks=partial_masks)
+                output_mask = self.get_non_special_sym_mask(
+                    tokens, partial_masks=partial_masks
+                )
 
                 output_tokens = tokens.masked_fill(output_mask, self.mask_id)
                 output_scores = torch.zeros_like(output_tokens, dtype=torch.float)
@@ -179,7 +265,7 @@ class ConditionalDPLM(nn.Module):
                 return output_tokens, output_scores
 
         return initial_output_tokens, initial_output_scores
-    
+
     def _reparam_decoding(
         self,
         output_tokens,
@@ -194,7 +280,7 @@ class ConditionalDPLM(nn.Module):
         noise,
     ):
         """
-            This function is used to perform reparameterized decoding.
+        This function is used to perform reparameterized decoding.
         """
         # output_tokens: [B, N]
         # output_scores: [B, N]
@@ -221,37 +307,15 @@ class ConditionalDPLM(nn.Module):
         ).long()
         # set the scores of special symbols to a large value so that they will never be selected
         _scores_for_topk = cur_scores.masked_fill(~non_special_sym_mask, 1000.0)
-        
-        to_be_resample = []
-        for i, seq in enumerate(cur_tokens):
-            most_token_dict = {}
-            most_token = None
-            most_token_num = -1
-            for j, token in enumerate(seq):
-                token = int(token)
-                if token == self.pad_id:
-                    continue
-                if token not in most_token_dict:
-                    most_token_dict[token] = [j]
-                else:
-                    most_token_dict[token].append(j)
-                if len(most_token_dict[token]) > most_token_num:
-                    most_token = token
-                    most_token_num = len(most_token_dict[token])
-            if most_token_num > len(seq) * 0.25:
-                to_be_resample.append(i)
-                
+
         # the top-k selection can be done in two ways: stochastic by injecting Gumbel noise or deterministic
         if topk_mode.startswith("stochastic"):
             noise_scale = float(topk_mode.replace("stochastic", ""))
-            lowest_k_mask = topk_masking(_scores_for_topk, cutoff_len, stochastic=True, temp=noise_scale * rate)
+            lowest_k_mask = topk_masking(
+                _scores_for_topk, cutoff_len, stochastic=True, temp=noise_scale * rate
+            )
         elif topk_mode == "deterministic":
             lowest_k_mask = topk_masking(_scores_for_topk, cutoff_len, stochastic=False)
-            if len(to_be_resample) > 0:
-                noise_scale = 1.5
-                #print(lowest_k_mask[to_be_resample[0]])
-                lowest_k_mask[to_be_resample] = topk_masking(_scores_for_topk[to_be_resample], cutoff_len[to_be_resample], 
-                                                             stochastic=True, temp=noise_scale * rate)
         else:
             raise NotImplementedError
 
@@ -272,7 +336,11 @@ class ConditionalDPLM(nn.Module):
         # the current token score becomes lower, AND
         # the current token score is not in the top-k share among all tokens).
         if condition == "cond":
-            not_v1_t = (cur_tokens == output_tokens) & (cur_scores < output_scores) & lowest_k_mask
+            not_v1_t = (
+                (cur_tokens == output_tokens)
+                & (cur_scores < output_scores)
+                & lowest_k_mask
+            )
         elif condition == "uncond":
             not_v1_t = lowest_k_mask
         else:
@@ -303,13 +371,18 @@ class ConditionalDPLM(nn.Module):
         new_xt_neq_x0 = (xt_neq_x0 | not_v1_t) & not_v2_t
         assert (new_xt_neq_x0 == not_v2_t).all()
         return new_xt_neq_x0, output_tokens, output_scores
-    
-    def generate(self, batch, tokenizer=None, 
-                 max_iter=None, temperature=None, 
-                 partial_masks=None,
-                 sampling_strategy='argmax',
-                 use_draft_seq=True):
-        tokenizer = tokenizer 
+
+    def generate(
+        self,
+        batch,
+        tokenizer=None,
+        max_iter=None,
+        temperature=None,
+        partial_masks=None,
+        sampling_strategy="argmax",
+        use_draft_seq=False,
+    ):
+        tokenizer = tokenizer
         max_iter = max_iter
         temperature = temperature
 
@@ -317,7 +390,11 @@ class ConditionalDPLM(nn.Module):
         encoder_out = self.forward_encoder(batch, use_draft_seq=use_draft_seq)
         # 1) initialized from all mask tokens
         initial_output_tokens, initial_output_scores = self.initialize_output_tokens(
-            batch, encoder_out=encoder_out, partial_masks=partial_masks, use_draft_seq=use_draft_seq)
+            batch,
+            encoder_out=encoder_out,
+            partial_masks=partial_masks,
+            use_draft_seq=use_draft_seq,
+        )
         prev_decoder_out = dict(
             output_tokens=initial_output_tokens,
             output_scores=initial_output_scores,
@@ -329,40 +406,39 @@ class ConditionalDPLM(nn.Module):
             temperature=temperature,
         )
 
-        prev_decoder_out['output_masks'] = self.get_non_special_sym_mask(
-                prev_decoder_out['output_tokens'], partial_masks=partial_masks
-            )
+        prev_decoder_out["output_masks"] = self.get_non_special_sym_mask(
+            prev_decoder_out["output_tokens"], partial_masks=partial_masks
+        )
 
-        for step in tqdm(range(max_iter), desc='Decoding'):
+        for step in tqdm(range(max_iter), desc="Decoding"):
             # 2.1: predict
             with torch.no_grad():
                 decoder_out = self.forward_decoder(
                     prev_decoder_out=prev_decoder_out,
                     encoder_out=encoder_out,
                     partial_masks=partial_masks,
-                    sampling_strategy=sampling_strategy
+                    sampling_strategy=sampling_strategy,
                 )
 
-            output_tokens = decoder_out['output_tokens']
-            output_scores = decoder_out['output_scores']
+            output_tokens = decoder_out["output_tokens"]
+            output_scores = decoder_out["output_scores"]
 
             # 2.2: re-mask skeptical parts of low confidence
             non_special_sym_mask = self.get_non_special_sym_mask(
-                prev_decoder_out['output_tokens'], partial_masks=partial_masks
+                prev_decoder_out["output_tokens"], partial_masks=partial_masks
             )
-            
+
             output_masks, result_tokens, result_scores = self._reparam_decoding(
                 output_tokens=output_tokens.clone(),
                 output_scores=output_scores.clone(),
-                cur_tokens=prev_decoder_out['output_tokens'].clone(),
-                cur_scores=prev_decoder_out['output_scores'].clone(),
-                decoding_strategy='reparam-uncond-deterministic-linear',
-                # decoding_strategy='reparam-uncond-deterministic-cosine',
-                xt_neq_x0=prev_decoder_out['output_masks'],
+                cur_tokens=prev_decoder_out["output_tokens"].clone(),
+                cur_scores=prev_decoder_out["output_scores"].clone(),
+                decoding_strategy="reparam-uncond-deterministic-linear",
+                xt_neq_x0=prev_decoder_out["output_masks"],
                 non_special_sym_mask=non_special_sym_mask,
                 t=step + 1,
                 max_step=max_iter,
-                noise=self.mask_id, # if 'init_pred' not in encoder_out else encoder_out['init_pred'],
+                noise=self.mask_id,  # if 'init_pred' not in encoder_out else encoder_out['init_pred'],
             )
             prev_decoder_out.update(output_masks=output_masks)
             output_tokens = result_tokens
@@ -372,8 +448,8 @@ class ConditionalDPLM(nn.Module):
                 output_tokens=output_tokens,
                 output_scores=output_scores,
                 step=step + 1,
-                history=decoder_out['history']
+                history=decoder_out["history"],
             )
 
         decoder_out = prev_decoder_out
-        return decoder_out['output_tokens'], decoder_out['output_scores']
+        return decoder_out["output_tokens"], decoder_out["output_scores"]

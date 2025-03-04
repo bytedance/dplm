@@ -1,4 +1,3 @@
-
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
@@ -10,34 +9,38 @@ import torch
 import torch.nn as nn
 from byprot.models import register_model
 from omegaconf import OmegaConf
-from byprot.models.lm.model_utils import LoRAConfig, NetConfig, get_net, get_net_class, \
-    sample_from_categorical, stochastic_sample_from_categorical, top_k_top_p_filtering, topk_masking
+from byprot.models.lm.model_utils import (
+    LoRAConfig,
+    NetConfig,
+    get_net,
+    get_net_class,
+    sample_from_categorical,
+    stochastic_sample_from_categorical,
+    top_k_top_p_filtering,
+    topk_masking,
+)
 from transformers import AutoTokenizer, AutoConfig
 from tqdm import tqdm
 import os
-    
+
+
 @dataclass
 class DPLMConfig:
-    num_diffusion_timesteps: int = field(
-        default=500
-    )
+    num_diffusion_timesteps: int = field(default=500)
     lora: LoRAConfig = field(default=LoRAConfig())
     net: NetConfig = field(default=NetConfig())
-    gradient_ckpt: bool = field(
-        default=False
-    )
-    rdm_couple: bool = field(
-        default=False
-    )
+    gradient_ckpt: bool = field(default=False)
+    rdm_couple: bool = field(default=False)
 
-@register_model('dplm')
+
+@register_model("dplm")
 class DiffusionProteinLanguageModel(nn.Module):
     _default_cfg = DPLMConfig()
-    
+
     def __init__(self, cfg, net=None):
         super().__init__()
         self._update_cfg(cfg)
-        
+
         self.net = get_net(self.cfg) if net is None else net
         self.tokenizer = self.net.tokenizer
 
@@ -46,13 +49,15 @@ class DiffusionProteinLanguageModel(nn.Module):
         self.bos_id = self.net.bos_id
         self.eos_id = self.net.eos_id
         self.x_id = self.net.x_id
-        
+
         if self.cfg.gradient_ckpt:
             self.net.supports_gradient_checkpointing = True
             self.net.gradient_checkpointing_enable()
-    
+
     @classmethod
-    def from_pretrained(cls, net_name, cfg_override={}, net_override={}, from_huggingface=True):
+    def from_pretrained(
+        cls, net_name, cfg_override={}, net_override={}, from_huggingface=True
+    ):
         if not from_huggingface:
             # Load model checkpoint from local if you pretrain a DPLM with this repo
             # The net_name should be like:
@@ -61,21 +66,32 @@ class DiffusionProteinLanguageModel(nn.Module):
             from byprot.utils.config import load_yaml_config
             from pathlib import Path
             from collections import OrderedDict
-            
+
             cfg_path = Path(net_name).parents[1]
-            cfg_path = Path(cfg_path, '.hydra', 'config.yaml')
+            cfg_path = Path(cfg_path, ".hydra", "config.yaml")
             cfg = load_yaml_config(str(cfg_path)).model
             cfg.net.pretrain = False
-            cfg.pop('_target_')
+            cfg.pop("_target_")
             model = cls(cfg)
-            
-            pretrained_state_dict = torch.load(net_name, map_location=torch.device("cpu"))['state_dict']
+
+            pretrained_state_dict = torch.load(
+                net_name, map_location=torch.device("cpu")
+            )["state_dict"]
             new_pretrained_state_dict = OrderedDict()
-            
+
             # remove the module prefix "model."
             for k, v in pretrained_state_dict.items():
                 new_pretrained_state_dict[k[6:]] = v
-            model.load_state_dict(new_pretrained_state_dict, strict=False) 
+
+            missing, unexpected = model.load_state_dict(
+                new_pretrained_state_dict, strict=False
+            )
+            print(
+                f"Restored from {net_name} with {len(missing)} missing and {len(unexpected)} unexpected keys"
+            )
+            if len(missing) > 0:
+                print(f"Missing Keys: {missing}")
+                print(f"Unexpected Keys: {unexpected}")
             return model
         else:
             # Load DPLM model checkpoint from huggingface
@@ -83,33 +99,32 @@ class DiffusionProteinLanguageModel(nn.Module):
             net_class = get_net_class(net_type)
             net = net_class.from_pretrained(net_name, **net_override)
             return cls(cfg=cfg_override, net=net)
-    
+
     def _update_cfg(self, cfg):
-        # if '_target_' in cfg.net:
-        #     cfg.net.pop('_target_')
         self.cfg = OmegaConf.merge(self._default_cfg, cfg)
-        
+
     def q_sample_coupled(self, x_0, t1, t2, maskable_mask):
-        # partial mask: True for the part should not be mask
-        t1_eq_t2_mask = (t1 == t2)
+        t1_eq_t2_mask = t1 == t2
         t1, t2 = torch.maximum(t1, t2).float(), torch.minimum(t1, t2).float()
 
         # sample t1
         u = torch.rand_like(x_0, dtype=torch.float)
         t1_mask = (u < (t1 / self.cfg.num_diffusion_timesteps)[:, None]) & maskable_mask
-        x_t1 = x_0.masked_fill(t1_mask, self.mask_id) 
+        x_t1 = x_0.masked_fill(t1_mask, self.mask_id)
 
         # sample t2
         u = torch.rand_like(x_0, dtype=torch.float)
         t2_mask = t1_mask & (u > ((t1 - t2) / t1)[:, None])
         u = torch.rand_like(x_0[t1_eq_t2_mask], dtype=torch.float)
-        t2_mask[t1_eq_t2_mask] = (u < (t1[t1_eq_t2_mask] / self.cfg.num_diffusion_timesteps)[:, None]) & (maskable_mask[t1_eq_t2_mask])
-        x_t2 = x_0.masked_fill(t2_mask, self.mask_id) 
+        t2_mask[t1_eq_t2_mask] = (
+            u < (t1[t1_eq_t2_mask] / self.cfg.num_diffusion_timesteps)[:, None]
+        ) & (maskable_mask[t1_eq_t2_mask])
+        x_t2 = x_0.masked_fill(t2_mask, self.mask_id)
 
         return {
             "x_t": torch.cat([x_t1, x_t2], dim=0),
             "t": torch.cat([t1, t2]),
-            "mask_mask": torch.cat([t1_mask, t2_mask], dim=0)
+            "mask_mask": torch.cat([t1_mask, t2_mask], dim=0),
         }
 
     def q_sample(self, x_0, t1, maskable_mask):
@@ -124,41 +139,42 @@ class DiffusionProteinLanguageModel(nn.Module):
             "t": t1,
             "mask_mask": t1_mask,
         }
-        
+
     def forward(self, input_ids, return_last_hidden_state=False, **kwargs):
         outputs = self.net(
             input_ids=input_ids,
         )
-        logits = outputs['logits']
+        logits = outputs["logits"]
         if return_last_hidden_state:
-            last_hidden_state = outputs['last_hidden_state']
+            last_hidden_state = outputs["last_hidden_state"]
             return logits, last_hidden_state
         else:
             return logits
 
-    def compute_loss(self, batch, weighting='constant'):
-        target = batch['targets']
+    def compute_loss(self, batch, weighting="constant"):
+        target = batch["targets"]
 
-        # couple
         t1, t2 = torch.randint(
-            1, self.cfg.num_diffusion_timesteps + 1,
-            (2 * target.size(0), ),
-            device=target.device
+            1,
+            self.cfg.num_diffusion_timesteps + 1,
+            (2 * target.size(0),),
+            device=target.device,
         ).chunk(2)
 
         if self.cfg.rdm_couple:
+            # couple training
+            # refer to Appendix G: Improved Training with Conditioning
+            # and Algorithm 3 in Zheng et al., 2023 (https://arxiv.org/pdf/2302.05737)
             x_t, t, loss_mask = list(
                 self.q_sample_coupled(
-                    target, t1, t2,
-                    maskable_mask=self.get_non_special_sym_mask(target)
+                    target, t1, t2, maskable_mask=self.get_non_special_sym_mask(target)
                 ).values()
             )
             target = target.repeat(2, 1)
         else:
             x_t, t, loss_mask = list(
                 self.q_sample(
-                    target, t1,
-                    maskable_mask=self.get_non_special_sym_mask(target)
+                    target, t1, maskable_mask=self.get_non_special_sym_mask(target)
                 ).values()
             )
 
@@ -166,35 +182,50 @@ class DiffusionProteinLanguageModel(nn.Module):
 
         num_timesteps = self.cfg.num_diffusion_timesteps
         weight = {
-            "linear": (num_timesteps - (t - 1)),    # num_timesteps * (1 - (t-1)/num_timesteps)
-            "constant": num_timesteps * torch.ones_like(t)
+            "linear": (
+                num_timesteps - (t - 1)
+            ),  # num_timesteps * (1 - (t-1)/num_timesteps)
+            "constant": num_timesteps * torch.ones_like(t),
         }[weighting][:, None].float() / num_timesteps
-        
+
         return logits, target, loss_mask, weight
 
     def forward_encoder(self, batch, **kwargs):
         return {}
 
     def initialize_output_tokens(self, batch, partial_masks=None, **kwargs):
-        tokens = batch['input_ids']
+        tokens = batch["input_ids"]
         if tokens is None:
             raise NotImplementedError
         else:
-            output_mask = self.get_non_special_sym_mask(tokens, partial_masks=partial_masks)
+            output_mask = self.get_non_special_sym_mask(
+                tokens, partial_masks=partial_masks
+            )
 
             output_tokens = tokens.masked_fill(output_mask, self.mask_id)
             output_scores = torch.zeros_like(output_tokens, dtype=torch.float)
 
             return output_tokens, output_scores
 
-    def resample_conditional(self, _tokens, _scores, ratio, scale):
+    def resample(self, _tokens, _scores, ratio, scale):
+        """
+        Rejection sampling for eliminating the unexpected repeat patterns in generation results, e.g., GGGGG....
+        We first calculate the frequency of all tokens,
+        and for the tokens that have a frequency higher than the threshold (length * ratio),
+        we mask them and resample conditioning on the remaining tokens.
+
+        For example, the generation result is MLKNVVVVVVVVVVLDN,
+        we mask the 'V' tokens to get MLKN<mask><mask><mask><mask><mask><mask><mask><mask><mask><mask>LDN,
+        and resample to get MLKNVTKYYGEVKALDN.
+        """
         to_be_resample_idx = []
         resample_input = []
         resample_input_mask = []
         resample_input_scores = []
+
+        # Calculate the frequency of all tokens
         for i, seq in enumerate(_tokens):
             most_token_dict = {}
-            most_token = None
             most_token_num = -1
             for j, token in enumerate(seq):
                 token = int(token)
@@ -203,26 +234,30 @@ class DiffusionProteinLanguageModel(nn.Module):
                 else:
                     most_token_dict[token].append(j)
                 if len(most_token_dict[token]) > most_token_num:
-                    most_token = token
                     most_token_num = len(most_token_dict[token])
-            if most_token_num > len(seq) * ratio:#max(0.3/(step+1) ** 0.2, 0.1):
+            if most_token_num > len(seq) * ratio:
+                # For all tokens with a frequency higher than the threshold, transform them to mask token.
                 to_be_resample_idx.append(i)
                 resample_input_scores.append(_scores[i])
                 mask = torch.zeros_like(seq).bool()
                 for k, v in most_token_dict.items():
-                    if len(v) > len(seq) * ratio:#max(0.3/(step+1) ** 0.2, 0.1):
+                    if len(v) > len(seq) * ratio:
                         mask |= seq.eq(k)
                 resample_input_mask.append(mask)
                 resample_input.append(seq.masked_fill(mask, self.mask_id))
-                #resample_input.append(seq.masked_scatter(mask, xt[i][mask]))
-            
+
         if len(to_be_resample_idx) > 0:
+            # Resample the sequences that have tokens with higher frequency than threthold.
             resample_input = torch.stack(resample_input, dim=0).type_as(_tokens)
-            resample_input_scores = torch.stack(resample_input_scores, dim=0).type_as(_scores)
-            resample_input_mask = torch.stack(resample_input_mask, dim=0).type_as(_tokens).bool()
+            resample_input_scores = torch.stack(resample_input_scores, dim=0).type_as(
+                _scores
+            )
+            resample_input_mask = (
+                torch.stack(resample_input_mask, dim=0).type_as(_tokens).bool()
+            )
             resample_logits = self.net(
                 input_ids=resample_input,
-            )['logits']
+            )["logits"]
             if resample_logits.dtype != _scores.dtype:
                 resample_logits = resample_logits.type_as(_scores)
             resample_logits[..., self.mask_id] = -math.inf
@@ -230,33 +265,51 @@ class DiffusionProteinLanguageModel(nn.Module):
             resample_logits[..., self.pad_id] = -math.inf
             resample_logits[..., self.bos_id] = -math.inf
             resample_logits[..., self.eos_id] = -math.inf
-            
+
             resample_logits = top_k_top_p_filtering(resample_logits, top_p=0.95)
-            #noise_scale = 1.5 - 0.2 * ((step + 1) / max_step)
             noise_scale = scale
             assert resample_logits.size(0) == len(to_be_resample_idx)
-            resample_tokens, resample_scores = stochastic_sample_from_categorical(resample_logits, temperature=0.0, noise_scale=noise_scale)
-            resample_input.masked_scatter_(resample_input_mask, resample_tokens[resample_input_mask])
-            resample_input_scores.masked_scatter_(resample_input_mask, resample_scores[resample_input_mask])
-            _tokens[to_be_resample_idx], _scores[to_be_resample_idx] = resample_input, resample_input_scores
-            
-    def forward_decoder(self, prev_decoder_out, encoder_out=None, need_attn_weights=False, partial_masks=None,
-                        sampling_strategy='gumbel_argmax'):
-        output_tokens = prev_decoder_out['output_tokens'].clone()
-        output_scores = prev_decoder_out['output_scores'].clone()
-        step, max_step = prev_decoder_out['step'], prev_decoder_out['max_step']
-        temperature = prev_decoder_out['temperature']
-        history = prev_decoder_out['history']
+            resample_tokens, resample_scores = stochastic_sample_from_categorical(
+                resample_logits, temperature=0.0, noise_scale=noise_scale
+            )
+            resample_input.masked_scatter_(
+                resample_input_mask, resample_tokens[resample_input_mask]
+            )
+            resample_input_scores.masked_scatter_(
+                resample_input_mask, resample_scores[resample_input_mask]
+            )
+            _tokens[to_be_resample_idx], _scores[to_be_resample_idx] = (
+                resample_input,
+                resample_input_scores,
+            )
 
-        output_masks = self.get_non_special_sym_mask(output_tokens, partial_masks=partial_masks)
+    def forward_decoder(
+        self,
+        prev_decoder_out,
+        encoder_out=None,
+        need_attn_weights=False,
+        partial_masks=None,
+        sampling_strategy="gumbel_argmax",
+        disable_resample=False,
+        resample_ratio=0.25,
+    ):
+        output_tokens = prev_decoder_out["output_tokens"].clone()
+        output_scores = prev_decoder_out["output_scores"].clone()
+        step, max_step = prev_decoder_out["step"], prev_decoder_out["max_step"]
+        temperature = prev_decoder_out["temperature"]
+        history = prev_decoder_out["history"]
+
+        output_masks = self.get_non_special_sym_mask(
+            output_tokens, partial_masks=partial_masks
+        )
 
         net_out = self.net(
             input_ids=output_tokens,
         )
-        
-        logits = net_out['logits']
-        attentions = net_out['attentions'] if need_attn_weights else None
-        
+
+        logits = net_out["logits"]
+        attentions = net_out["attentions"] if need_attn_weights else None
+
         if logits.dtype != output_scores.dtype:
             logits = logits.type_as(output_scores)
 
@@ -265,21 +318,24 @@ class DiffusionProteinLanguageModel(nn.Module):
         logits[..., self.pad_id] = -math.inf
         logits[..., self.bos_id] = -math.inf
         logits[..., self.eos_id] = -math.inf
-        
-        #logits = top_k_top_p_filtering(logits, top_p=0.95)
 
-        if sampling_strategy == 'vanilla':
+        # logits = top_k_top_p_filtering(logits, top_p=0.95)
+
+        if sampling_strategy == "vanilla":
             _tokens, _scores = sample_from_categorical(logits, temperature=temperature)
-        elif sampling_strategy == 'argmax':
+        elif sampling_strategy == "argmax":
             _scores, _tokens = logits.max(-1)
-        elif sampling_strategy == 'gumbel_argmax':
+        elif sampling_strategy == "gumbel_argmax":
             noise_scale = 1.0
-            _tokens, _scores = stochastic_sample_from_categorical(logits, temperature=0.0, noise_scale=noise_scale)
+            _tokens, _scores = stochastic_sample_from_categorical(
+                logits, temperature=0.0, noise_scale=noise_scale
+            )
 
-            self.resample_conditional(_tokens, _scores, ratio=0.25, scale=1.0)
+            if not disable_resample:
+                self.resample(_tokens, _scores, ratio=resample_ratio, scale=1.0)
         else:
             raise NotImplementedError
-        
+
         output_tokens.masked_scatter_(output_masks, _tokens[output_masks])
         output_scores.masked_scatter_(output_masks, _scores[output_masks])
 
@@ -288,21 +344,21 @@ class DiffusionProteinLanguageModel(nn.Module):
         return dict(
             output_tokens=output_tokens,
             output_scores=output_scores,
-            attentions=attentions, # [B, L, H, T, T]
+            attentions=attentions,  # [B, L, H, T, T]
             step=step + 1,
             max_step=max_step,
             history=history,
-            hidden_states=net_out['last_hidden_state']
+            hidden_states=net_out["last_hidden_state"],
         )
 
     def get_non_special_sym_mask(self, output_tokens, partial_masks=None):
         non_special_sym_mask = (
-            output_tokens.ne(self.pad_id) &
-            output_tokens.ne(self.bos_id) &
-            output_tokens.ne(self.eos_id)
+            output_tokens.ne(self.pad_id)
+            & output_tokens.ne(self.bos_id)
+            & output_tokens.ne(self.eos_id)
         )
         if partial_masks is not None:
-            non_special_sym_mask &= (~partial_masks)
+            non_special_sym_mask &= ~partial_masks
         return non_special_sym_mask
 
     def _reparam_decoding(
@@ -319,7 +375,7 @@ class DiffusionProteinLanguageModel(nn.Module):
         noise,
     ):
         """
-            This function is used to perform reparameterized decoding.
+        This function is used to perform reparameterized decoding.
         """
         # output_tokens: [B, N]
         # output_scores: [B, N]
@@ -346,37 +402,15 @@ class DiffusionProteinLanguageModel(nn.Module):
         ).long()
         # set the scores of special symbols to a large value so that they will never be selected
         _scores_for_topk = cur_scores.masked_fill(~non_special_sym_mask, 1000.0)
-        
-        to_be_resample = []
-        for i, seq in enumerate(cur_tokens):
-            most_token_dict = {}
-            most_token = None
-            most_token_num = -1
-            for j, token in enumerate(seq):
-                token = int(token)
-                if token == self.pad_id:
-                    continue
-                if token not in most_token_dict:
-                    most_token_dict[token] = [j]
-                else:
-                    most_token_dict[token].append(j)
-                if len(most_token_dict[token]) > most_token_num:
-                    most_token = token
-                    most_token_num = len(most_token_dict[token])
-            if most_token_num > len(seq) * 0.25:
-                to_be_resample.append(i)
-                
+
         # the top-k selection can be done in two ways: stochastic by injecting Gumbel noise or deterministic
         if topk_mode.startswith("stochastic"):
             noise_scale = float(topk_mode.replace("stochastic", ""))
-            lowest_k_mask = topk_masking(_scores_for_topk, cutoff_len, stochastic=True, temp=noise_scale * rate)
+            lowest_k_mask = topk_masking(
+                _scores_for_topk, cutoff_len, stochastic=True, temp=noise_scale * rate
+            )
         elif topk_mode == "deterministic":
             lowest_k_mask = topk_masking(_scores_for_topk, cutoff_len, stochastic=False)
-            if len(to_be_resample) > 0:
-                noise_scale = 1.5
-                #print(lowest_k_mask[to_be_resample[0]])
-                lowest_k_mask[to_be_resample] = topk_masking(_scores_for_topk[to_be_resample], cutoff_len[to_be_resample], 
-                                                             stochastic=True, temp=noise_scale * rate)
         else:
             raise NotImplementedError
 
@@ -397,7 +431,11 @@ class DiffusionProteinLanguageModel(nn.Module):
         # the current token score becomes lower, AND
         # the current token score is not in the top-k share among all tokens).
         if condition == "cond":
-            not_v1_t = (cur_tokens == output_tokens) & (cur_scores < output_scores) & lowest_k_mask
+            not_v1_t = (
+                (cur_tokens == output_tokens)
+                & (cur_scores < output_scores)
+                & lowest_k_mask
+            )
         elif condition == "uncond":
             not_v1_t = lowest_k_mask
         else:
@@ -429,11 +467,18 @@ class DiffusionProteinLanguageModel(nn.Module):
         assert (new_xt_neq_x0 == not_v2_t).all()
         return new_xt_neq_x0, output_tokens, output_scores
 
-    def generate(self, batch, tokenizer=None, 
-                 max_iter=None, temperature=None, 
-                 partial_masks=None,
-                 sampling_strategy='gumbel_argmax'):
-        tokenizer = tokenizer 
+    def generate(
+        self,
+        batch,
+        tokenizer=None,
+        max_iter=None,
+        temperature=None,
+        partial_masks=None,
+        sampling_strategy="gumbel_argmax",
+        disable_resample=False,
+        resample_ratio=0.25,
+    ):
+        tokenizer = tokenizer
         max_iter = max_iter
         temperature = temperature
 
@@ -441,7 +486,8 @@ class DiffusionProteinLanguageModel(nn.Module):
         encoder_out = self.forward_encoder(batch)
         # 1) initialized from all mask tokens
         initial_output_tokens, initial_output_scores = self.initialize_output_tokens(
-            batch, encoder_out=encoder_out, partial_masks=partial_masks)
+            batch, encoder_out=encoder_out, partial_masks=partial_masks
+        )
         prev_decoder_out = dict(
             output_tokens=initial_output_tokens,
             output_scores=initial_output_scores,
@@ -453,54 +499,43 @@ class DiffusionProteinLanguageModel(nn.Module):
             temperature=temperature,
         )
 
-        prev_decoder_out['output_masks'] = self.get_non_special_sym_mask(
-                prev_decoder_out['output_tokens'], partial_masks=partial_masks
-            )
+        prev_decoder_out["output_masks"] = self.get_non_special_sym_mask(
+            prev_decoder_out["output_tokens"], partial_masks=partial_masks
+        )
 
-        for step in tqdm(range(max_iter), desc='Decoding'):
+        for step in tqdm(range(max_iter), desc="Decoding"):
             # 2.1: predict
             with torch.no_grad():
                 decoder_out = self.forward_decoder(
                     prev_decoder_out=prev_decoder_out,
                     encoder_out=encoder_out,
                     partial_masks=partial_masks,
-                    sampling_strategy=sampling_strategy
+                    sampling_strategy=sampling_strategy,
+                    disable_resample=disable_resample,
+                    resample_ratio=resample_ratio,
                 )
 
-            output_tokens = decoder_out['output_tokens']
-            output_scores = decoder_out['output_scores']
+            output_tokens = decoder_out["output_tokens"]
+            output_scores = decoder_out["output_scores"]
 
             # 2.2: re-mask skeptical parts of low confidence
             non_special_sym_mask = self.get_non_special_sym_mask(
-                prev_decoder_out['output_tokens'], partial_masks=partial_masks
+                prev_decoder_out["output_tokens"], partial_masks=partial_masks
             )
-            
+
             output_masks, result_tokens, result_scores = self._reparam_decoding(
-                output_tokens=prev_decoder_out['output_tokens'].clone(),
-                output_scores=prev_decoder_out['output_scores'].clone(),
+                output_tokens=prev_decoder_out["output_tokens"].clone(),
+                output_scores=prev_decoder_out["output_scores"].clone(),
                 cur_tokens=output_tokens.clone(),
                 cur_scores=output_scores.clone(),
-                decoding_strategy='reparam-uncond-deterministic-linear',#'reparam-uncond-stochastic1.0-linear'
-                xt_neq_x0=prev_decoder_out['output_masks'],
+                decoding_strategy="reparam-uncond-deterministic-linear",
+                xt_neq_x0=prev_decoder_out["output_masks"],
                 non_special_sym_mask=non_special_sym_mask,
                 t=step + 1,
                 max_step=max_iter,
                 noise=self.mask_id,
             )
-            # output_masks, result_tokens, result_scores = self._reparam_decoding(
-            #     output_tokens=output_tokens.clone(),#output_tokens,#
-            #     output_scores=output_scores.clone(),#output_scores,##
-            #     cur_tokens=prev_decoder_out['output_tokens'].clone(),#prev_decoder_out['output_tokens'],##
-            #     cur_scores=prev_decoder_out['output_scores'].clone(),#prev_decoder_out['output_scores'],##
-            #     decoding_strategy='reparam-uncond-deterministic-linear',#'reparam-uncond-stochastic1.0-linear',#,##
-            #     # decoding_strategy='reparam-uncond-deterministic-cosine',
-            #     xt_neq_x0=prev_decoder_out['output_masks'],
-            #     non_special_sym_mask=non_special_sym_mask,
-            #     t=step + 1,
-            #     max_step=max_iter,
-            #     noise=self.mask_id, # if 'init_pred' not in encoder_out else encoder_out['init_pred'],
-            #     mask_811=False
-            # )
+
             prev_decoder_out.update(output_masks=output_masks)
             output_tokens = result_tokens
             output_scores = result_scores
@@ -509,8 +544,8 @@ class DiffusionProteinLanguageModel(nn.Module):
                 output_tokens=output_tokens,
                 output_scores=output_scores,
                 step=step + 1,
-                history=decoder_out['history']
+                history=decoder_out["history"],
             )
 
         decoder_out = prev_decoder_out
-        return decoder_out['output_tokens'], decoder_out['output_scores']
+        return decoder_out["output_tokens"], decoder_out["output_scores"]

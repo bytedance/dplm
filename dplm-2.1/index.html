@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Elucidating the Design Space of Multimodal Protein Language Models">
+  <meta property="og:title" content="Elucidating the Design Space of Multimodal Protein Language Models">
+  <meta property="og:description" content="Elucidating the Design Space of Multimodal Protein Language Models">
+  <!-- <meta property="og:image" content="https://tao-amodal.github.io/static/images/webpage_preview.png"> -->
+  <meta property="twitter:title" content="Elucidating the Design Space of Multimodal Protein Language Models">
+  <meta property="twitter:description" content="Elucidating the Design Space of Multimodal Protein Language Models">
+  <!-- <meta property="twitter:image" content="https://tao-amodal.github.io/static/images/webpage_preview.png"> -->
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="keywords"
+    content="DPLM-2.1, Multimodal Protein Language Models, Desing Space, Protein Language Model, Diffusion Model, Bitwise modeling, Residual Diffusion, Flow Matching, Geometric Designs, Multimer, Representation Alignment, Protein Sequence, Protein Structure, Discrete Diffusion, Structure Tokenization, Protein, DPLM-2">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elucidating the Design Space of Multimodal Protein Language Models</title>
+  <!-- <link rel="icon" type="image/x-icon" href="./static/images/car_icon.png"> -->
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-D65ZW4CJYF"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-D65ZW4CJYF');
+  </script>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="stylesheet" href="./static/css/animation_style.css"> <!-- Animation styles -->
+  <link rel="stylesheet" href="./static/css/style.css"> <!-- Animation styles -->
+
+  <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script> -->
+  <script src="./static/js/jquery-3.6.4.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/lazy.js"></script>
+  <script src="./static/js/faster.js"></script>
+  <script src="./static/js/index.js"></script>
+  <script src="./static/js/animation_script.js"></script>
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+</head>
+
+<body>
+
+  <section class="hero" style="border-bottom: 1px solid #dbdbdb;">
+    <div class="hero-body" style="padding-bottom: 1.2rem;">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">
+              Elucidating the Design Space of <br>Multimodal Protein Language Models
+            </h1>
+            <div class="is-size-6 publication-authors">
+              <span class="author-block">
+                <a href="https://wesleyhsieh0806.github.io/">Wesley Hsieh</a><sup>1 *,†</sup>,</span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=5JsycngAAAAJ">Xinyou Wang</a><sup>1,2 *</sup>, </span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=hluDH7EAAAAJ">Daiheng Zhang</a><sup>1,3 ‡</sup>, </span>
+              <span class="author-block">
+                <a href="https://openreview.net/profile?id=~Dongyu_Xue1">Dongyu Xue</a><sup>1</sup>, </span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=4MB4orsAAAAJ">Fei Ye</a><sup>1</sup>, </span>
+              <span class="author-block">
+                <a href="http://nlp.nju.edu.cn/huangsj/">Shujian Huang</a><sup>2</sup>, </span>
+              <span class="author-block">
+                <a href="https://zhengzx-nlp.github.io/">Zaixiang Zheng</a><sup>1 †</sup>, </span>
+              <span class="author-block">
+                <a href="https://web.cs.ucla.edu/~qgu/">Quanquan Gu</a><sup>1 #</sup>, </span><br>
+            </div>
+            <!-- <div class="is-size-5 publication-authors">
+              <span class="author-block">
+                <a href="https://wesleyhsieh0806.github.io/">Wesley Hsieh</a><sup>1</sup>,</span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=5JsycngAAAAJ">Xinyou Wang</a><sup>1,2</sup>, </span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=hluDH7EAAAAJ">Daiheng Zhang</a><sup>1,3</sup>, </span>
+              <span class="author-block">
+                <a href="https://openreview.net/profile?id=~Dongyu_Xue1">Dongyu Xue</a><sup>1</sup>, </span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=4MB4orsAAAAJ">Fei Ye</a><sup>1</sup>, </span>
+              <span class="author-block">
+                <a href="http://nlp.nju.edu.cn/huangsj/">Shujian Huang</a><sup>2</sup>, </span>
+              <span class="author-block">
+                <a href="https://zhengzx-nlp.github.io/">Zaixiang Zheng</a><sup>1</sup>, </span>
+              <span class="author-block">
+                <a href="https://web.cs.ucla.edu/~qgu/">Quanquan Gu</a><sup>1</sup>, </span><br>
+            </div> -->
+
+            <!-- <div class="is-size-5 publication-authors">
+              <span class="author-block"><sup>1</sup>Carnegie Mellon University &nbsp; </span>
+              <span class="author-block"><sup>2</sup>Toyota Research Institute &nbsp; </span>
+              <span class="author-block"><small style="font-size: 0.8em;"><br><sup>*</sup>Equal Contribution</small></span>
+              <span class="author-block"><small style="font-size: 0.8em;"><br><sup>†</sup>Project Lead</small></span>
+              <span class="author-block"><small style="font-size: 0.8em;"><br><sup>‡</sup>Core Contributor</small></span>
+            </div> -->
+            <div class="is-size-6 publication-authors">
+              <span class="author-block"><sup>1</sup>ByteDance Research </span>
+              &nbsp;&nbsp;
+              <span class="author-block"><sup>2</sup>Nanjing University  </span>
+              &nbsp;&nbsp;
+              <span class="author-block"><sup>3</sup>Rutgers University  </span>
+              &nbsp;&nbsp;
+              <span class="eql-cntrb"><small style="font-size: 0.75em;"><br>
+                  <sup>*</sup>Equal Contribution
+                  &nbsp;
+                  <sup>†</sup>Project Lead
+                  &nbsp;
+                  <sup>‡</sup>Core Contributor
+                  &nbsp;
+                  <sup>#</sup>Corresponding Author
+                </small>
+              </span>
+            </div>
+            <!-- <h1 style="font-size:24px">ICCV 2023 (<b>Oral, Best Student Paper</b>)</h1> -->
+            <!-- <h2 class="subtitle is-3 has-text-weight-semibold mt-1 mb-1" style="color: #F05365;"> ICML 2025 (<b>Oral</b>) </h2> -->
+            <div class="column has-text-centered">
+              <div class="publication-links">
+                <!-- PDF Link. -->
+                <span class="link-block">
+                  <a href="" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                    </span>
+                    <span>Paper</span>
+                  </a>
+                </span>
+                <!-- Video Link. -->
+                <!-- <span class="link-block">
+                  <a href="https://www.youtube.com/watch?v=KHoAG3gA024"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fab fa-youtube"></i>
+                    </span>
+                    <span>Video</span>
+                  </a>
+                </span> -->
+                <!-- Code Link. -->
+                <span class="link-block">
+                  <a href="https://github.com/bytedance/dplm"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fab fa-github"></i>
+                    </span>
+                    <span>Code</span>
+                  </a>
+                </span>
+                <!-- Model Link. -->
+                <span class="link-block">
+                  <a href="#" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">🤗</span>
+                    <span>Model Checkpoints (Incoming)</span>
+                  </a>
+                </span>
+                <!-- Citation Link. -->
+                <span class="link-block">
+                  <a href="" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      📚
+                    </span>
+                    <span>Citation</span>
+                  </a>
+                </span>
+              </div>
+            </div>
+            <span class="publication-venue" style="font-weight: 500; font-size: 1.9ch; ; margin-top: 0.5rem; margin-bottom: 0.3rem; display: inline-block;">
+              <strong>Design choices are essential:</strong> Our designs enable the 650M multimodal PLM to <br>outperform 3B-scale baselines and specialized structure folding models.
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <style>
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      /* Three columns */
+      grid-template-rows: repeat(1, 1fr);
+      /* Two rows */
+      gap: 0px 4px;
+      /* Gap between videos */
+      width: 80%;
+      /* Set the container width to 80% */
+      margin: 0 auto;
+      /* Center the container horizontally */
+    }
+
+    .video-grid video {
+      width: 100%;
+      /* Videos fill the container width */
+      height: auto;
+    }
+  </style>
+
+  <section class="section" style="padding-top: 0rem;">
+    <!-- <div class="column has-text-centered">
+      <span class="publication-venue" style="font-weight: 500; font-size: 1.9ch;">
+        <strong>Design choices are essential:</strong> Our designs enable the 650M multimodal PLM to <br>outperform the 3B-scale baselines and specialized folding model.
+      </span>
+    </div> -->
+    <div class="animation-wrapper">
+      <div class="animation-container">
+          <!-- Center Captions (Order Corrected: Line 1 then Line 2) -->
+          <div class="center-captions" id="centerCaptions">
+              <p id="captionLine2"><span class="color-limited">Limited</span> Structural Modeling</p>
+              <p id="captionLine1"><span class="color-strong">Strong</span> Sequence Modeling</p>
+          </div>
+          <!-- Central Block -->
+          <div class="block center-block" id="centerBlock">
+              <a href="#Overview">
+                  <!-- <span class="block-caption">Multimodal PLM</span> -->
+                  <!-- Uncomment this if we decide to name our work as DPLM-2.5 -->
+                  <span class="center-block-caption">
+                      <p id="centerCaption">DPLM-2</p>
+                  </span>
+              </a>
+          </div>
+
+          <!-- Structure and Sequence Rows (Order Corrected: Seq then Struct to match image example more closely) -->
+          <div class="structure-sequence-display" id="structureSequenceRows">
+              <div class="data-section structure-section">
+                  <span class="data-label">Struct.</span>
+                  <!-- Verify this image path is correct relative to index.html -->
+                  <img src="./static/img/1a26.jpeg" alt="Protein Structure" class="structure-image">
+              </div>
+              <div class="data-section sequence-section">
+                  <span class="data-label">Seq.</span>
+                  <div class="sequence-text-box">MKTVRQERLK</div>
+              </div>
+          </div>
+
+          <!-- Corner Blocks (Link Fixed in top-right) -->
+          <div class="block corner-block top-left" id="topLeftBlock">
+              <a href="#improved-prediction">
+                  <span class="block-caption-small">Improved Generative Modeling</span>
+              </a>
+          </div>
+          <div class="block corner-block bottom-left" id="bottomLeftBlock">
+              <a href="#REPA">
+                  <span class="block-caption-small">Structure-aware Representation Alignment</span>
+              </a>
+          </div>
+          <div class="block corner-block top-right" id="topRightBlock">
+              <!-- FIXED LINK WRAPPING -->
+              <a href="#Geometry">
+                  <span class="block-caption-small">Geometric Modules</span>
+              </a>
+          </div>
+          <div class="block corner-block bottom-right" id="bottomRightBlock">
+              <a href="#multimer">
+                  <span class="block-caption-small">Data Exploration (Multimer)</span>
+              </a>
+          </div>
+
+          <!-- SVG for Connecting Lines -->
+          <svg class="lines-svg" id="linesSvg" viewbox="0 0 720 450">
+              <!-- Connect from new corner positions to center block edges -->
+             <line id="lineTL" x1="175" y1="115" x2="240" y2="190" /> <!-- y1 changed from 105 -->
+             <line id="lineBL" x1="175" y1="355" x2="240" y2="260" /> <!-- y1 changed from 345 -->
+             <line id="lineTR" x1="545" y1="115" x2="480" y2="190" /> <!-- y1 changed from 105 -->
+             <line id="lineBR" x1="545" y1="355" x2="480" y2="260" /> <!-- y1 changed from 345 -->
+         </svg>
+      </div> <!-- End of animation-container -->
+  </div> <!-- End of animation-wrapper -->
+  </section>
+
+  <br>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Abstract</h2>
+          <div class="content has-text-justified">
+            <p>
+              Multimodal protein language models (PLMs) integrate sequence and token-based structural information, serving as a powerful foundation for protein modeling, generation, and design. 
+              However, the reliance on tokenizing 3D structures into discrete tokens causes substantial loss of fine-grained structural details and correlations. 
+              In this paper, we systematically elucidate the design space of multimodal PLMs to overcome their limitations on structural modeling. 
+              We identify tokenization loss and inaccurate structure token predictions by the PLMs as major bottlenecks.
+              To address these, our proposed design space covers improved generative modeling, structure-aware architectures and representation learning, and data exploration. 
+              Our advancements approach finer-grained supervision, demonstrating that token-based multimodal PLMs can achieve robust structural modeling.
+              The effective design methods dramatically improve the structure generation diversity, and notably, folding abilities of our 650M model by reducing the RMSD from 5.52 to 2.36 on PDB testset, even outperforming 3B baselines and on par with the specialized folding models.
+            </p>
+          </div>
+        </div>
+      </div>
+      <br>
+      <!-- Paper video. -->
+      <!-- <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Video</h2>
+          <div class="publication-video">
+            <a id="overview_video"></a>
+            <iframe src="https://www.youtube.com/embed/KHoAG3gA024">
+            </iframe>
+          </div>
+        </div> -->
+    </div>
+    </div>
+    <!--/ Paper video. -->
+  </section>
+
+  <style>
+    img {
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  </style>
+
+  <section>
+    <div class="container is-max-desktop content">
+      <div class="column is-full-width">
+        <div class="toc content mb-5"> <!-- mb-5 adds margin below the TOC -->
+          <h2 class="title is-3" id="Overview">Table of Contents</h2>
+          <ul>
+              <li><a href="#Overview">Design Space Overview</a></li>
+              <li><a href="#contributions-findings">Major Contributions</a></li>
+              <li><a href="#advance-multimodal-plm">Advance Multimodal PLMs</a></li>
+              <ul>
+                <li><a href="#pitfalls-tokenized">Pitfalls of Structure Tokenization</a></li>
+                <li><a href="#improved-prediction">Improved Structure Prediction</a></li>
+                <li><a href="#Geometry">Geometric Architectures</a></li>
+                <li><a href="#REPA">Representation Alignment</a></li>
+                <li><a href="#Orthogonality">Orthogonality</a></li>
+                <li><a href="#multimer">Multimer Exploration</a></li>
+              </ul>
+              <li><a href="#Conclusion">Conclusion</a></li>
+          </ul>
+          <hr> <!-- Optional: Add a horizontal rule after the TOC -->
+      </div>
+        <h2 class="title is-3" id="Overview"> Design Space Overview </h2>
+        <div class="content has-text-justified">
+          <p>
+            We systematically explore the key pitfalls and the design space of token-based multimodal protein language models 
+            to bridge their limitations on structural modeling. Building upon DPLM-2, we advance the designs spanning 
+            <strong>improved generative modeling, structure-aware architectures, representation learning, and data exploration.</strong> 
+            We provide a taxonomy table of our design methods in the paper.
+          </p>
+          <figure style="margin-top: 1rem; margin-bottom: 1rem;"> 
+            <img src="./static/img/combined-structure-modeling.png" alt="Overview of design space" style="width:120%;">
+            
+            <!-- Add the figcaption below the image -->
+            <figcaption class="has-text-centered is-size-7 mt-2"> 
+              <strong>Method overview.</strong> Our design space spans improved generative modeling, structure-aware architectures, representation learning, and data exploration.</strong>
+            </figcaption>
+          </figure>
+        </div>
+        <h2 class="title is-3" id="contributions-findings"> Major Contributions and Findings </h2>
+        <div class="content has-text-justified">
+          <p>
+            Our main contributions are summarized as follows:
+          </p>
+          <ul>
+            <li>We conduct a comprehensive study  revealing key pitfalls in structure token-based multimodal protein language models, and systematically elucidate their design space for robust structural modeling.</li>
+            <li>Utilizing improved approaches such as bit-wise discrete modeling offers finer-grained supervision, significantly improving structure generative capability.</li>
+            <li>Introducing representation-level learning and architectural innovations infuses geometric inductive biases and effectively refines generation diversity.</li>
+            <li>We find that multimer and monomer modeling are deeply interconnected and leveraging multimer data advances the structural modeling for both single and multi-chain proteins.</li>
+            <li>Our design methods allow multimodal PLMs to achieve robust structural understanding, improving the folding RMSD from 5.52 to 2.36 on the PDB date dataset, outperforming 3B folding baselines with only 650M parameters.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <div class="container is-max-desktop content">
+      <div class="column is-full-width">
+        <h2 class="title is-3" id="advance-multimodal-plm"> Advance Multimodal PLM</h2>
+        <h3 class="title is-4" id="pitfalls-tokenized"> Pitfalls of Modeling over Tokenized Structures</h3>
+        <div class="content has-text-justified">
+          <p>
+            We highlight key <strong>(O)</strong>bservations on the limitations of structure tokenization along with their implications as follows: 
+          </p>
+        </div>
+        <!-- Observation1 -->
+        <div style="border-left: 4px solid #ccc; padding: 1em; background-color: #f9f9f9; font-style: italic; font-weight: bold;">
+          (O1): Structure tokenization results in information loss.
+        </div>
+
+        <div class="container is-max-desktop content"> <!-- Adjust container as needed -->
+          <figure class="table-container mt-5 mb-5"> <!-- Responsive wrapper with margins -->
+        
+            <figcaption class="has-text-centered is-size-6 mb-3">
+              <!-- Manually add Table Number if desired -->
+              <b>Table 1:</b> <!-- Adjust number as needed -->
+              <strong>Effects of feature quantization on structure tokenizer reconstruction.</strong>
+            </figcaption>
+        
+            <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">
+              <thead>
+                <tr>
+                  <!-- Using is-vcentered for better alignment with rowspan -->
+                  <th rowspan="2" class="is-vcentered has-text-centered">Latent feature</th>
+                  <th rowspan="2" class="is-vcentered has-text-right">Struct token type</th>
+                  <th colspan="2" class="has-text-centered">Reconstruction</th>
+                </tr>
+                <tr>
+                  <!-- These are the sub-headers under "Reconstruction" -->
+                  <th class="has-text-centered">RMSD ↓</th>
+                  <th class="has-text-centered">TMscore ↑</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <!-- Math rendering: Using simple HTML/Unicode. Use MathJax/KaTeX for complex equations -->
+                  <td class="has-text-centered"><strong><em>z</em></strong><sub>cont</sub></td>
+                  <td class="has-text-right">(pre-quantized) continuous token</td>
+                  <td class="has-text-centered"><strong>1.3127</strong></td>
+                  <td class="has-text-centered"><strong>0.9733</strong></td>
+                </tr>
+                <tr>
+                  <!-- Using ↔ for the LeftRightArrow symbol -->
+                  <td class="has-text-centered"><strong><em>z</em></strong><sub>index</sub> ↔ <strong><em>z</em></strong><sub>quant</sub></td>
+                  <td class="has-text-right">(quantized) discrete token</td>
+                  <td class="has-text-centered">1.9806</td>
+                  <td class="has-text-centered">0.9385</td>
+                </tr>
+              </tbody>
+            </table>
+          </figure>
+        </div>
+        <div class="content has-text-justified">
+          <p>
+            🧪 <strong>Analysis.</strong> Applying token quantization significantly amplifies reconstruction errors
+            (\(\mathrm{RMSD}~ 1.31 \nearrow 1.98\) &amp; \(\mathrm{TMscore}~ 0.97 \searrow 0.93\))
+            , inevitably resulting in loss of fidelity hence detailed structural accuracy.
+            <br>
+            <br>
+            📌 <strong>Implications:</strong> Learning to recover the lost residuals could enhance structure prediction accuracy.
+          </p>
+        </div>
+        <!-- <div>
+          <img src="./static/img/1a26.jpeg" alt="Teaser" style="width:80%;">
+        </div> -->
+
+        <!-- Observation2 -->
+        <div style="border-left: 4px solid #ccc; padding: 1em; background-color: #f9f9f9; font-style: italic; font-weight: bold;">
+          (O2): High reconstruction accuracy does not guarantee better structure generative performance in language models.
+        </div>
+        <div class="container is-max-desktop content"> <!-- Adjust container as needed -->
+          <figure class="table-container mt-5 mb-5"> <!-- Responsive wrapper with margins -->
+        
+            <figcaption class="has-text-centered is-size-6 mb-3">
+              <!-- Manually add Table Number if desired -->
+              <b>Table 2:</b> <!-- Adjust number as needed -->
+              <strong>Tokenizer reconstruction vs. language model generation.</strong> Evaluation of folding on CAMEO 2022.
+            </figcaption>
+        
+            <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">
+              <thead>
+                <tr>
+                  <!-- Tokenizer header spans 2 rows -->
+                  <th rowspan="2" class="is-vcentered">Tokenizer</th>
+                  <!-- Reconstruction header spans 2 columns -->
+                  <th colspan="2" class="has-text-centered">Reconstruction</th>
+                  <!-- Generation header spans 2 columns -->
+                  <th colspan="2" class="has-text-centered">Generation</th>
+                </tr>
+                <tr>
+                  <!-- Sub-headers for Reconstruction -->
+                  <th class="has-text-centered">rRMSD ↓</th>
+                  <th class="has-text-centered">rTMscore ↑</th>
+                  <!-- Sub-headers for Generation -->
+                  <th class="has-text-centered">RMSD ↓</th>
+                  <th class="has-text-centered">TMscore ↑</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <!-- Assuming '\method' refers to DPLM-2 based on context -->
+                  <td>DPLM-2</td>
+                  <td class="has-text-centered">1.9806</td>
+                  <td class="has-text-centered">0.9385</td>
+                  <td class="has-text-centered"><strong>7.7025</strong></td>
+                  <td class="has-text-centered"><strong>0.7936</strong></td>
+                </tr>
+                <tr>
+                  <td>ESM3</td>
+                  <td class="has-text-centered"><strong>0.7248</strong></td>
+                  <td class="has-text-centered"><strong>0.9912</strong></td>
+                  <td class="has-text-centered">8.4424</td>
+                  <td class="has-text-centered">0.7924</td>
+                </tr>
+              </tbody>
+            </table>
+          </figure>
+        </div>
+        <div class="content has-text-justified">
+          <p>
+            🧪 <strong>Analysis.</strong> We select tokenizers from DPLM-2 and ESM3, training separate DPLM-2 variants using their respective structure token codebooks. 
+            Although the ESM3 tokenizer achieves superior reconstruction accuracy 
+            (\(\mathrm{RMSD}: 0.72\), \(\mathrm{TMscore}: 0.99\)), the model trained with the DPLM-2 tokenizer’s codebook exhibits stronger protein folding performance.
+            <br>
+            <br>
+            📌 <strong>Implications:</strong> Improvements in reconstruction do not necessarily translate into better generation, and hence greater emphasis should be placed on 
+            improving generative modeling and architectural design.
+          </p>
+        </div>
+
+
+
+        <!-- Observation3 -->
+        <div style="border-left: 4px solid #ccc; padding: 1em; background-color: #f9f9f9; font-style: italic; font-weight: bold;">
+          (O3): Index-based structure tokens? Multimodal PLM gets them miserably wrong in structure prediction.
+        </div>
+        <div class="container is-max-desktop content"> <!-- Adjust container as needed -->
+          <figure class="table-container mt-5 mb-5"> <!-- Responsive wrapper with margins -->
+        
+            <figcaption class="has-text-centered is-size-6 mb-3">
+              <!-- Manually add Table Number if desired -->
+              <b>Table 3:</b> <!-- Adjust number as needed -->
+              <strong>Language model structure token prediction accuracy.</strong> Index-based vs. bits-based evaluation on structure folding.
+            </figcaption>
+        
+            <style>
+              /* Ensure this is included if not already in your global CSS */
+              .small-caps {
+                font-variant: small-caps;
+              }
+            </style>
+        
+            <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">
+              <thead>
+                <tr>
+                  <!-- rowspan=2 for first two columns -->
+                  <th rowspan="2" class="is-vcentered">Model</th>
+                  <th rowspan="2" class="is-vcentered">Testset</th>
+                  <!-- colspan=2 for the next two groups -->
+                  <th colspan="2" class="has-text-centered">Struct Token Acc ↑</th>
+                  <th colspan="2" class="has-text-centered">Struct Eval Metric</th>
+                </tr>
+                <tr>
+                  <!-- Sub-headers under the colspan groups -->
+                  <th class="has-text-centered">index</th>
+                  <th class="has-text-centered">bit</th>
+                  <th class="has-text-centered">RMSD ↓</th>
+                  <th class="has-text-centered">TMscore ↑</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Group 1: DPLM-2 index-based -->
+                <tr>
+                  <!-- rowspan=2 on the first occurrence of the model name -->
+                  <td rowspan="2" class="is-vcentered">DPLM-2 index-based</td>
+                  <td>CAMEO 2022</td>
+                  <td class="has-text-centered">0.0864</td>
+                  <td class="has-text-centered">0.7720</td>
+                  <td class="has-text-centered">7.7025</td>
+                  <td class="has-text-centered">0.7936</td>
+                </tr>
+                <tr>
+                  <!-- Model name cell omitted due to rowspan -->
+                  <td>PDB date split</td>
+                  <td class="has-text-centered">0.1188</td>
+                  <td class="has-text-centered">0.7932</td>
+                  <td class="has-text-centered">5.3071</td>
+                  <td class="has-text-centered">0.8306</td>
+                </tr>
+                <!-- Visual separator provided by is-bordered / is-striped -->
+                <!-- Group 2: DPLM-2 Bit-based -->
+                <tr>
+                  <!-- rowspan=2 on the first occurrence of the model name -->
+                  <td rowspan="2" class="is-vcentered">DPLM-2 <span class="small-caps">Bit</span>-based</td>
+                  <td>CAMEO 2022</td>
+                  <td class="has-text-centered"><strong>0.1258</strong></td>
+                  <td class="has-text-centered"><strong>0.7958</strong></td>
+                  <td class="has-text-centered"><strong>6.4028</strong></td>
+                  <td class="has-text-centered"><strong>0.8380</strong></td>
+                </tr>
+                <tr>
+                  <!-- Model name cell omitted due to rowspan -->
+                  <td>PDB date split</td>
+                  <td class="has-text-centered"><strong>0.2641</strong></td>
+                  <td class="has-text-centered"><strong>0.8648</strong></td>
+                  <td class="has-text-centered"><strong>3.2213</strong></td>
+                  <td class="has-text-centered"><strong>0.9043</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </figure>
+        </div>
+        <div class="content has-text-justified">
+          <p>
+            🧪 <strong>Analysis.</strong> Direct index prediction of structure token is highly inaccurate. (0.0864 on CAMEO).
+            The conventional learning process of index-based labels is highly challenging: 
+            since each index is derived from multiple quantized bits,
+            even small changes at the bit level can result in drastically
+            different indices, leading to suboptimal generation performance. 
+            <br>
+            <br>
+            📌 <strong>Implications:</strong> While the model struggles to recover exact indices, 
+            it effectively captures structural patterns at the bit level.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="container is-max-desktop content">
+      <div class="column is-full-width">
+        <h3 class="title is-4" id="improved-prediction"> Improved Structure Prediction</h3>
+        <div class="content has-text-justified">
+          <p>
+            In this section, we present several improvements on generative modeling aimed at
+            enhancing the accuracy and detail of protein structure modeling. 
+            These approaches build upon the initial structure
+            tokenization and aim to improve predictions by introducing methods for recovering tokenization losses (ResDiff), 
+            bridging discrete and continuous tokens (Bit-based), and
+            enabling direct data-space modeling (Hybrid). 
+            <br>
+            These designs significantly improve the structural generative performance of DPLM-2, even outperforming the 3B-scale baseline.
+            We <span style="background-color: rgb(252, 247, 237);">highlight these results</span> below.
+          </p>
+          <figure style="margin-top: 1rem; margin-bottom: 1rem;"> 
+            <figcaption class="has-text-centered is-size-6 mb-3"> 
+              <i>Table 4.</i> <strong>Evaluation of improved approaches for structure prediction based upon DPLM-2.</strong> 
+            </figcaption>
+            <img src="./static/img/improved_structure_prediction.png" alt="Overview of design space" style="width:80%;">
+            
+            <!-- Add the figcaption below the image -->
+          </figure>
+        </div>
+        <!-- <div>
+          <img src="./static/img/1a26.jpeg" alt="Teaser" style="width:80%;">
+        </div> -->
+      </div>
+    </div>
+    <div class="container is-max-desktop content">
+      <div class="column is-full-width">
+        <h3 class="title is-4" id="Geometry"> Geometry-aware Architectures</h3>
+        <div class="content has-text-justified">
+          <p>
+            We introduce geometric modules to capture higher-order relationship between residues beyond simple sequence-based architectures, essential 
+            for the intricate nature of protein structures as evidenced in protein folding.
+            Our component-wise analysis reveals a balanced configuration that significantly improves both structural modeling and generation diversity, 
+            without reducing much training efficiency—a common limitation of models with geometric layers.
+          </p>
+        </div>
+        <figure style="margin-top: 1rem; margin-bottom: 1rem;"> 
+          <img src="./static/img/geo_train_efficiency.png" alt="Training efficiency of geometric designs." style="width:80%;">
+          <figcaption class="has-text-centered is-size-6 mb-3"> 
+            <strong>Component-wise training efficiency analysis</strong> allows us to arrive at a balanced configuration that improves structural modeling and generation diversity, 
+            without reducing much training efficiency.
+          </figcaption>
+          
+          <!-- Add the figcaption below the image -->
+        </figure>
+        <!-- <div>
+          <img src="./static/img/1a26.jpeg" alt="Teaser" style="width:80%;">
+        </div> -->
+      </div>
+    </div>
+    <div class="container is-max-desktop content">
+      <div class="column is-full-width">
+        <h3 class="title is-4" id="REPA"> Structure-aware Representation Alignment</h3>
+        <div class="content has-text-justified">
+          <p>
+            We adopt representation alignment (REPA) to enhance structure generation by addressing two core challenges: the limitations of discrete tokens 
+            and the challenge of training diffusion models in learning high-quality representations. 
+            Unlike sharp discrete supervision, REPA enables smooth, high-dimensional learning 
+            that preserves subtle structural details. 
+            To transfer meaningful structural semantics, we align representations from the protein language model 
+            with those from a specialized folding model—using ESMFold for its efficient inference, 
+            though other models like AlphaFold are compatible. 
+            Originally designed for vision, we demonstrate that REPA improves the structural diversity of generated proteins and is compatible with both 
+            sequence- and geometry-based architectures.
+          </p>
+        </div>
+        <figure style="margin-top: 1rem; margin-bottom: 1rem;"> 
+          <figcaption class="has-text-centered is-size-6 mb-3"> 
+            <i>Table 6. </i><strong>Representation alignment improves folding prediction</strong> and is compatible with both language model-based architectures and geometric design.
+          </figcaption>
+          <img src="./static/img/REPA_compatible.png" alt="Representation alignment improves structure predic-
+          tion." style="width:80%;">
+          
+          <!-- Add the figcaption below the image -->
+        </figure>
+        <figure style="margin-top: 1rem; margin-bottom: 1rem;"> 
+          <img src="./static/img/geo_diversity_normalized.png" alt="Effects on generation diversity." style="width:80%;">
+          <figcaption class="has-text-centered is-size-6 mb-3"> 
+            <strong>Effects on generation diversity.</strong> Representation alignment significantly improves the low generation diversity of the multimodal PLM.
+          </figcaption>
+          
+          <!-- Add the figcaption below the image -->
+        </figure>
+        <!-- <div>
+          <img src="./static/img/1a26.jpeg" alt="Teaser" style="width:80%;">
+        </div> -->
+      </div>
+    </div>
+    <div class="container is-max-desktop content">
+      <div class="column is-full-width">
+        <h3 class="title is-4" id="Orthogonality"> Analysis of Orthogonality</h3>
+        <div class="content has-text-justified">
+          <p>
+            Building on the individual analysis of each design method, we examine the interactions
+            of these designs by combining them in a unified setting. This analysis completes our blueprint, enabling us to 
+            recommend a final configuration and discuss the orthogonality between each design.
+          </p>
+        </div>
+        <figure style="margin-top: 1rem; margin-bottom: 1rem;"> 
+          <figcaption class="has-text-centered is-size-6 mb-3"> 
+            <i>Table 7. </i><strong>Analysis of orthogonality.</strong> We analyze the compatibility
+            of design methods when combined, with the recommended setting
+            highlighted.
+          </figcaption>
+          <img src="./static/img/orthogonality.png" alt="Analysis of orthogonality." style="width:80%;">
+          
+          <!-- Add the figcaption below the image -->
+        </figure>
+        <!-- <div>
+          <img src="./static/img/1a26.jpeg" alt="Teaser" style="width:80%;">
+        </div> -->
+      </div>
+    </div>
+    <div class="container is-max-desktop content">
+      <div class="column is-full-width">
+        <h3 class="title is-4" id="multimer"> Multimer Data Exploration</h3>
+        <div class="content has-text-justified">
+          <p>
+            Multimer (multi-chain protein) data presents diverse structural arrangements and 
+            interaction scenarios, which are essential for developing a more general multimodal model. 
+            Notably, most existing protein language models have been trained solely on single-chain proteins (monomer). 
+            We conduct a series of analysis to examine the relevance and gap between monomer and multimer data.
+            Our findings suggest that multimer and monomer data are <strong>deeply interconnected</strong>, and incorporating multimer data could 
+            effectively improves the structure folding for both multimer and monomer.
+          </p>
+        </div>
+        <div class="container is-max-desktop content"> <!-- Adjust container as needed -->
+          <figure class="table-container mt-5 mb-5"> <!-- Responsive wrapper with margins -->
+        
+            <figcaption class="has-text-centered is-size-6 mb-3">
+              <!-- Manually add Table Number if desired -->
+              <b>Table 5:</b> <!-- Adjust number as needed -->
+              <strong>Fine-tuning with multimer and monomer data.</strong> We evaluate the effects of fine-tuning with PDB-Multimer and Swissprot on structure prediction. Incorporating multimer data improves both monomer and multimer folding.
+            </figcaption>
+        
+            <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">
+              <thead>
+                <tr>
+                  <!-- Header Row 1 -->
+                  <th colspan="2" class="has-text-centered">Training Data</th>
+                  <!-- rowspan=2 for SFT to span both header definition rows -->
+                  <th rowspan="2" class="has-text-centered is-vcentered">SFT</th>
+                  <th colspan="2" class="has-text-centered">PDB-Multimer</th>
+                  <th colspan="2" class="has-text-centered">CAMEO 2022</th>
+                </tr>
+                <tr>
+                  <!-- Header Row 2: Defines columns under 'Training Data', 'PDB-Multimer', 'CAMEO 2022' -->
+                  <th class="has-text-centered">PDB-Multimer</th>
+                  <th class="has-text-centered">Swissprot</th>
+                  <!-- SFT column omitted due to rowspan -->
+                  <th class="has-text-centered">RMSD ↓</th>
+                  <th class="has-text-centered">TMscore ↑</th>
+                  <th class="has-text-centered">RMSD ↓</th>
+                  <th class="has-text-centered">TMscore ↑</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <!-- Row 1 Data -->
+                  <td class="has-text-centered"></td> <!-- Empty cell for PDB-Multimer column -->
+                  <td class="has-text-centered">✓</td> <!-- Swissprot checkmark -->
+                  <td class="has-text-centered"></td> <!-- SFT empty -->
+                  <td class="has-text-centered">17.966</td>
+                  <td class="has-text-centered">0.771</td>
+                  <td class="has-text-centered">7.703</td>
+                  <td class="has-text-centered">0.793</td>
+                </tr>
+                <tr>
+                  <!-- Row 2 Data -->
+                  <td class="has-text-centered"></td> <!-- PDB-Multimer empty -->
+                  <td class="has-text-centered">✓</td> <!-- Swissprot checkmark -->
+                  <td class="has-text-centered">✓</td> <!-- SFT checkmark -->
+                  <td class="has-text-centered">19.615</td>
+                  <td class="has-text-centered"><strong>0.799</strong></td>
+                  <td class="has-text-centered">6.612</td>
+                  <td class="has-text-centered">0.823</td>
+                </tr>
+                <tr>
+                  <!-- Row 3 Data -->
+                  <td class="has-text-centered">✓</td> <!-- PDB-Multimer checkmark -->
+                  <td class="has-text-centered"></td> <!-- Swissprot empty -->
+                  <td class="has-text-centered">✓</td> <!-- SFT checkmark -->
+                  <td class="has-text-centered"><strong>16.146</strong></td>
+                  <td class="has-text-centered">0.775</td>
+                  <td class="has-text-centered">10.989</td>
+                  <td class="has-text-centered">0.686</td>
+                </tr>
+                <tr>
+                  <!-- Row 4 Data -->
+                  <td class="has-text-centered">✓</td> <!-- PDB-Multimer checkmark -->
+                  <td class="has-text-centered">✓</td> <!-- Swissprot checkmark -->
+                  <td class="has-text-centered">✓</td> <!-- SFT checkmark -->
+                  <td class="has-text-centered"><u>16.674</u></td> <!-- Underlined -->
+                  <td class="has-text-centered"><u>0.798</u></td> <!-- Underlined -->
+                  <td class="has-text-centered"><strong>6.410</strong></td>
+                  <td class="has-text-centered"><strong>0.831</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </figure>
+        </div>
+        <!-- <div>
+          <img src="./static/img/1a26.jpeg" alt="Teaser" style="width:80%;">
+        </div> -->
+      </div>
+    </div>
+
+    <div class="container is-max-desktop content">
+      <div class="column is-full-width"></div>
+      <h2 class="title is-3" id="Conclusion"> Conclusion </h2>
+        <div class="content has-text-justified">            
+              <p>
+                In this work, we identify the limitations in structural modeling for multimodal protein language models 
+                and propose an effective design space to bridge the gap. 
+                We demonstrate that tokenization quantization loss can be effectively mitigated with bit-label supervision and flow-matching, 
+                which significantly improve the structure prediction accuracy. 
+                We introduce geometric inductive biases through architectural design and leverage representation learning 
+                to refine generation diversity. 
+                Building on the strengths of each component, we further investigate their orthogonality, 
+                which informs the final recommended setting. 
+                Lastly, to tackle the scarcity of structure data, 
+                we explore the data coverage to include multimers, ensuring broader 3D structural understanding. 
+                Our results show that these effective designs allow multimodal models to achieve on-par or even superior folding accuracy compared to larger, specialized folding models. We believe this work will contribute to advancing the development of more effective multimodal protein language models.
+              </p>  
+        </div>
+        <!-- </div> -->
+        <!-- <div>
+          <img src="static/images/teaser_final.png" alt="Teaser" style="width:80%;">
+        </div> -->
+      </div>
+    </div>
+  </section>
+
+    <style>
+      .video-grid-two-cols {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        /* Two columns */
+        gap: 10px;
+        /* Gap between videos */
+        width: 60%;
+        /* Set the container width to 60% */
+        margin: 0 auto;
+        /* Center the container horizontally */
+      }
+
+      .video-grid-two-cols video {
+        width: 100%;
+        /* Videos fill the container width */
+        height: auto;
+      }
+    </style>
+
+    
+
+
+    <!-- <section class="section" id="Acknowledgements">
+      <div class="container is-max-desktop content">
+        <h2 class="title is-3">Acknowledgements</h2>
+        The data collection efforts behind <a href="https://taodataset.org/">TAO</a> dataset are crucial for the
+        realization of TAO-Amodal.
+        We also thank <a href="https://github.com/Ali2500/BURST-benchmark">BURST</a> dataset for its collection of modal
+        mask annotations.
+        Amodal annotations for this dataset were provided by AnnotateX. We thank Neehar Peri and Jason Zhang from CMU
+        for their detailed feedback on the dataset and experiments.
+      </div>
+    </section> -->
+
+
+    <section class="section" id="BibTeX">
+      <div class="container is-max-desktop content">
+        <h2 class="title is-3" id="Citation">BibTeX</h2>
+        <pre><code>
+      @article{wang2024dplm2,
+      title={DPLM-2: A Multimodal Diffusion Protein Language Model},
+      author={Xinyou Wang and Zaixiang Zheng and Fei Ye and Dongyu Xue and Shujian Huang and Quanquan Gu},
+      year={2024},
+      eprint={2410.08631},
+      archivePrefix={arXiv},
+      primaryClass={q-bio.BM},
+      url={https://arxiv.org/abs/2410.08631},
+    }
+</code></pre>
+      </div>
+    </section>
+
+
+
+    <footer class="footer">
+      <div align="center" class="container">
+        <div class="columns is-centered">
+          <div class="content">
+            This website is borrowed from <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>.
+            You are free to borrow the source code of this website, we just ask that you link back to this page in the footer.
+              <br> This website is licensed under a <a rel="license"
+                href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
+                Commons Attribution-ShareAlike 4.0 International License</a>.
+          </div>
+        </div>
+      </div>
+    </footer>
+
+
+</body>
+
+</html>

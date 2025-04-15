@@ -1,0 +1,301 @@
+.structure-sequence-display {
+    position: absolute;
+    /* Position below captions - adjust '100px' as needed for spacing */
+    top: calc(50% + 100px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto; /* Let width be determined by content */
+    display: flex; /* Arrange sequence and structure sections horizontally */
+    align-items: flex-start; /* Align bottom of text box and image */
+    gap: 25px; /* Space between sequence and structure sections */
+    z-index: 4; /* Below captions, above lines */
+    opacity: 1; /* Start hidden */
+    transition: opacity 0.5s ease-in-out; /* Fade-in transition */
+    padding-bottom: 10px; /* Add some padding at the bottom if needed */
+}
+
+.data-section {
+    display: flex;
+    flex-direction: column; /* Stack label above data */
+    align-items: center; /* Center label and data horizontally within section */
+}
+
+.data-label {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #555; /* Dark grey label */
+    margin-bottom: 5px; /* Space between label and data */
+}
+
+.sequence-text-box {
+    padding: 6px 12px; /* Slightly more padding */
+    background-color: #e9ecef; /* Light grey background */
+    border: 1px solid #adb5bd; /* Grey border */
+    border-radius: 4px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+    color: #212529; /* Darker text */
+    white-space: nowrap; /* Prevent wrapping */
+    margin-top: 1.2em;
+}
+
+.structure-image {
+    display: block;
+    /* Adjust width as needed to match desired size */
+    width: 85px;
+    height: auto; /* Maintain aspect ratio */
+    border: 0px solid #dee2e6; /* Lighter border for the image */
+    border-radius: 4px; /* Optional rounded corners for image */
+    background-color: #fff; /* Ensure white background if image has transparency */
+    margin-top: -0.5em;
+}
+
+/* NEW: Style for the wrapper div */
+.animation-wrapper {
+    position: relative; /* Provides positioning context for children */
+    width: 100%; /* Take full width of the section's container */
+    display: block;      /* <<< ADD THIS to ensure it's a block-level element */
+    max-width: 720px; /* Max width matching animation container's viewbox */
+    height: 450px; /* Height matching animation container's viewbox */
+    margin: 0em auto; /* Center the wrapper horizontally, add some top/bottom margin */
+    overflow: visible;   /* Allow glow effects to spill out if needed */
+    box-sizing: border-box; /* Include padding/border in width calculation */
+    margin-bottom: -5em;
+}
+
+/* ADJUSTED: Animation container itself */
+.animation-container {
+    /* position: relative; <-- REMOVE THIS if present, wrapper handles it */
+    width: 100%; /* Fill the wrapper */
+    height: 100%; /* Fill the wrapper */
+    /* margin: 0 auto; <-- REMOVE THIS if present, wrapper's margin handles centering */
+
+    /* --- Keep all other existing styles for .animation-container --- */
+    /* For example: */
+    /* background-color: #some_color; (If you had one) */
+}
+
+
+/* Base Block Style (applies to center and corners unless overridden) */
+.block {
+    position: absolute;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 15px;
+    opacity: 0; /* Start hidden (except center block overrides this) */
+    transition: opacity 0.5s ease-in-out, box-shadow 0.3s ease-in-out, border 0.3s ease-in-out;
+}
+
+/* --- CHANGE: Fancier Center Block --- */
+.center-block {
+    width: 350px;   /* <<< Ensure this size */
+    height: 80px;   /* <<< Ensure this size */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2.0em; /* <<< Ensure this size */
+    font-weight: bold;
+    z-index: 10;
+    opacity: 1;
+
+    background-color: #FFFFFF;
+    border: 4px solid #555555;
+    color: #000000;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.center-block a {
+    color: inherit; /* Make link text color same as parent block */
+    text-decoration: none; /* Remove underline */
+}
+
+/* Optional: Add hover effect specifically for the linked blocks */
+.center-block:hover {
+    /* Example: slightly change background or border on hover */
+    background-color: #f0f7fa; /* Lighter teal background */
+    border-color: #339b19; /* Teal border */
+    cursor: pointer; /* Indicate it's clickable */
+}
+/* --- CHANGE: Captions Styling for White BG --- */
+.center-captions {
+    position: absolute;
+    /* Adjusted top slightly to make space for structure/sequence below */
+    top: calc(40% - 60px);
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    color: #333333; /* Dark grey text */
+    font-size: 1.1em;
+    width: 250px;
+    z-index: 5; /* Above structure/sequence rows */
+}
+
+.center-captions p {
+    margin: 2px 0;
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Colors for Strong/Limited */
+.color-strong {
+    color: #28a745; /* Slightly adjusted green */
+    font-weight: bold;
+}
+.color-limited {
+    color: #dc3545; /* Slightly adjusted red */
+    font-weight: bold;
+}
+.color-2-5 {
+    color: #28a745; /* Slightly adjusted green */
+    font-weight: bold;
+}
+/* --- NEW: Structure/Sequence Row Styling --- */
+.structure-sequence-rows {
+    position: absolute;
+    /* Position below the captions */
+    top: calc(50% + 90px); /* Adjust this value as needed for spacing */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px; /* Adjust width as needed */
+    display: flex;
+    flex-direction: column; /* Stack rows vertically */
+    align-items: center; /* Center rows horizontally */
+    gap: 8px; /* Space between rows */
+    z-index: 4; /* Below captions, above lines */
+    opacity: 0; /* Start hidden */
+    transition: opacity 0.5s ease-in-out; /* Fade-in transition */
+}
+
+.data-row {
+    display: flex; /* Arrange structure and sequence side-by-side */
+    justify-content: space-between; /* Space them out */
+    align-items: center;
+    background-color: #e9ecef; /* Light grey background */
+    border: 1px solid #ced4da; /* Light border */
+    border-radius: 4px;
+    padding: 5px 10px;
+    width: 100%; /* Take full width of the container */
+    box-sizing: border-box;
+}
+
+.structure-placeholder {
+    font-size: 0.8em;
+    color: #495057;
+    font-weight: bold;
+    /* Placeholder styling - replace with img or viewer */
+    padding: 2px 5px;
+    border: 1px dashed #6c757d;
+    background-color: #f8f9fa;
+    min-width: 50px; /* Ensure it has some width */
+    text-align: center;
+}
+
+.sequence-placeholder {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.8em;
+    color: #343a40;
+    white-space: nowrap; /* Prevent wrapping */
+    overflow: hidden; /* Hide overflow */
+    text-overflow: ellipsis; /* Add '...' for overflow */
+    flex-grow: 1; /* Allow sequence to take remaining space */
+    margin-left: 10px; /* Space from structure */
+    text-align: left;
+}
+
+/* --- CHANGE: Corner Blocks Styling for White BG --- */
+.corner-block {
+    width: 200px; /* Adjusted size */
+    height: 100px;
+    font-size: 0.9em;
+    line-height: 1.2;
+    z-index: 5;
+
+    /* Style similar to outer containers in the image */
+    background-color: #f8f9fa; /* Very light grey background */
+    border: 1px solid #adb5bd; /* Lighter grey border */
+    color: #343a40; /* Dark text */
+    border-radius: 12px; /* More rounded corners */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.07); /* Slightly stronger shadow */
+}
+
+.corner-block.visible {
+    opacity: 1;
+}
+
+/* --- CHANGE: "Flames" Effect for White BG --- */
+.corner-block.flaming {
+    /* Using a teal/cyan border inspired by tokens in the image */
+    border: 4px solid #17a2b8; /* Info Cyan/Teal */
+    box-shadow: 0 0 15px 6px rgba(23, 162, 184, 0.55); /* Slightly stronger glow */
+}
+
+/* Style links within corner blocks */
+.corner-block a {
+    color: inherit; /* Make link text color same as parent block */
+    text-decoration: none; /* Remove underline */
+}
+
+/* Optional: Add hover effect specifically for the linked blocks */
+.corner-block:hover {
+    /* Example: slightly change background or border on hover */
+    background-color: #f0f7fa; /* Lighter teal background */
+    border-color: #35CE8D; /* Teal border */
+    cursor: pointer; /* Indicate it's clickable */
+}
+
+/* If the block is also flaming, maybe adjust hover */
+.corner-block.flaming:hover {
+     /* Keep the flaming border prominent */
+     border-color: #35CE8D;
+     box-shadow: 0 0 15px 6px #6BA292; /* Slightly stronger glow */
+     /* You could slightly dim the background on hover if desired */
+     /* background-color: rgba(248, 249, 250, 0.9); */
+}
+
+/* Positioning (no change) */
+.top-left     { top: 35px; left: 15px; }  /* Was 25px, increased by 10 */
+.bottom-left  { bottom: 15px; left: 15px; } /* Was 25px, decreased by 10 */
+.top-right    { top: 35px; right: 15px; } /* Was 25px, increased by 10 */
+.bottom-right { bottom: 15px; right: 15px; }/* Was 25px, decreased by 10 */
+
+.block-caption { font-weight: bold; } /* Inside center block */
+.center-block-caption { font-weight: bold; 
+    transform: translateX(-50%);
+} /* Inside center block */
+.center-block-caption p { 
+    font-weight: bold; 
+    opacity: 1;
+    transition: opacity 0.30s ease-in-out;
+} 
+    /* Inside center block */
+.block-caption-small { font-size: 1.2em; } /* Inside corner blocks */
+
+/* --- CHANGE: Lines Styling for White BG --- */
+.lines-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.lines-svg line {
+    stroke: #6c757d; /* Medium grey lines */
+    stroke-width: 3; /* Slightly thinner */
+    stroke-linecap: round;
+    opacity: 0; /* Start fully transparent */
+    transition: opacity 1s ease-in-out; /* Fade duration */
+}
+
+/* Text Change Animation Helper (no change) */
+.caption-fade-out {
+    opacity: 0 !important;
+}
+.caption-fade-in {
+    opacity: 1 !important;
+}

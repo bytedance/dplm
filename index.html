@@ -1,275 +1,286 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <meta charset="utf-8">
-  <!-- Meta tags for social media banners, these should be filled in appropriately as they are your "business card" -->
-  <!-- Replace the content tag with appropriate information -->
-  <meta name="description" content="DPLM-2">
-  <meta property="og:title" content="DPLM-2" />
-  <meta property="og:description" content="DPLM-2: A Multimodal Diffusion Protein Language Model" />
-  <meta property="og:url" content="https://bytedance.github.io/dplm/dplm-2.html" />
-  <!-- Path to banner image, should be in the path listed below. Optimal dimensions are 1200X630-->
-  <meta property="og:image" content="static/image/your_banner_image.png" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-
-
-  <meta name="twitter:title" content="DPLM-2">
-  <meta name="twitter:description" content="DPLM-2: A Multimodal Diffusion Protein Language Model">
-  <!-- Path to banner image, should be in the path listed below. Optimal dimensions are 1200X600-->
-  <meta name="twitter:image" content="static/images/your_twitter_banner_image.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <!-- Keywords for your paper to be indexed by-->
-  <meta name="keywords" content="Protein Language Model; Diffusion Model; Mulitimodal Protein Foundation Model">
+  <meta name="description"
+        content="DPLM: Leading generative performance for protein modeling">
+  <meta name="keywords" content="DPLM, Diffusion Protein Language Model, Protein Design, Generative Model, AI, Protein Folding, Deep Learning, ByteDance Research">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DPLM: Leading generative performance for protein modeling, powered by the Diffusion Protein Language Model (DPLM)</title>
 
+  <!-- Google tag (gtag.js) -->
 
-  <title>cryoFM</title>
-  <!-- <link rel="icon" type="image/x-icon" href="static/images/cryostar.png"> -->
-  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+        rel="stylesheet">
 
-  <link rel="stylesheet" href="static/css/bulma.min.css">
-  <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
-  <link rel="stylesheet" href="static/css/bulma-slider.min.css">
-  <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
-  <link rel="stylesheet" href="static/css/index.css">
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <!-- <link rel="icon" href="./static/images/favicon.svg"> -->
 
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-  <script src="https://documentcloud.adobe.com/view-sdk/main.js"></script>
-  <script defer src="static/js/fontawesome.all.min.js"></script>
-  <script src="static/js/bulma-carousel.min.js"></script>
-  <script src="static/js/bulma-slider.min.js"></script>
-  <script src="static/js/index.js"></script>
-  <script src="https://fred-wang.github.io/TeXZilla/TeXZilla-min.js"></script>
-  <script src="https://fred-wang.github.io/TeXZilla/examples/customElement.js"></script>
-</head>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
 
+  <!-- Custom CSS -->
+  <style>
+    /* --- Card Styles --- */
+    .publication-card .card {
+      height: 100%; display: flex; flex-direction: column;
+      transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+      border: 1px solid #dbdbdb; border-radius: 6px;
+    }
+    .publication-card .card:hover {
+      transform: translateY(-5px); box-shadow: 0 8px 16px rgba(10, 10, 10, 0.1);
+    }
+    .publication-card a {
+      text-decoration: none; color: inherit; display: block; height: 100%;
+    }
+    .publication-card .card-content { flex-grow: 1; padding: 1.25rem; }
+    .publication-card .card-image img {
+      aspect-ratio: 16 / 9; object-fit: cover; background-color: #f5f5f5;
+      border-top-left-radius: 6px; border-top-right-radius: 6px;
+    }
+    .publication-card .card-image video { /* Changed from img to video */
+      /* These styles ensure the video fills the figure area */
+      display: block; /* Videos are inline by default, make it block */
+      width: 100%;
+      height: 100%;
+      /* Keep existing styles */
+      aspect-ratio: 16 / 9; /* Or adjust to your video's aspect ratio */
+      object-fit: cover;
+      background-color: #f5f5f5; /* Shows while video loads */
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+    }
+    .publication-card .card .title { margin-bottom: 0.75rem; line-height: 1.3; }
+    .publication-card .card .content p { font-size: 0.9rem; line-height: 1.5; color: #4a4a4a; }
+    .publication-card .card-content:last-child { padding-bottom: 1.25rem; }
+
+    /* Optional: Ensure navbar-brand items don't shrink too much */
+    .navbar-brand .navbar-item { flex-shrink: 0; }
+
+    /* Style for the main DPLM title */
+    .dplm-main-title { color: #2274A5; }
+
+    /* Style for the fancy code button */
+    .button-fancy-code {
+      background-image: linear-gradient(135deg, #4285F4 0%, #34A853 100%);
+      color: #ffffff !important; border: none; transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+    .button-fancy-code:hover {
+      color: #ffffff !important; transform: translateY(-2px);
+      box-shadow: 0 7px 14px rgba(50, 50, 93, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08);
+    }
+    .button-fancy-code .icon { color: #ffffff; }
+
+    /* Optional: Make icons inside large buttons slightly larger */
+    .button.is-large .icon:not(:last-child) { margin-right: 0.375rem; }
+    .button.is-large .icon:not(:first-child) { margin-left: 0.375rem; }
+
+    /* === NEW: Navbar Size Adjustments === */
+    /* Increase font size for brand text and main menu items/links */
+    .navbar-brand > .navbar-item span, /* Brand text */
+    .navbar-menu .navbar-item,      /* Menu items like Home */
+    .navbar-link {                  /* Dropdown toggle link */
+        font-size: 1.15rem; /* Adjust this value as needed (e.g., 1.1rem, 1.2rem) */
+    }
+
+    /* Increase font size for dropdown items slightly less or same */
+    .navbar-dropdown .navbar-item {
+        font-size: 1.05rem; /* Adjust as needed */
+    }
+    /* === END Navbar Size Adjustments === */
+
+  </style>
+
+</head>
 <body>
 
-
-  <section class="hero">
-    <div class="hero-body">
-      <div class="container is-max-desktop">
-        <div class="columns is-centered">
-          <div class="column has-text-centered">
-            <h1 class="title is-1 publication-title">
-                DPLM-2: A Multimodal Diffusion Protein Language Model
-            </h1>
-            <div class="is-size-5 publication-authors">
-              <!-- Paper authors -->
-              <span class="author-block">
-                Xinyou Wang,</span>
-              <span class="author-block">
-                Zaixiang Zheng<sup>*</sup>,</span>
-              <span class="author-block">
-                Fei Ye,</span>
-              <span class="author-block">
-                Dongyu Xue,</span>
-              <span class="author-block">
-                Shujian Huang, and </span>
-              <span class="author-block">
-                Quanquan Gu<sup>#</sup></span>
-            </div>
-
-            <div class="is-size-5 publication-authors">
-              <span class="author-block">
-                ByteDance Research, Nanjing University
-              </span>
-              <span class="eql-cntrb"><small><br>
-                  <sup>*</sup>Project Lead
-                  &nbsp;&nbsp;&nbsp;
-                  <sup>#</sup>Corresponding Author
-                </small>
-              </span>
-            </div>
-
-            <div class="has-text-grey">
-              wangxinyou@smail.nju.edu.cn, {zhengzaixiang,quanquan.gu}@bytedance.com
-            </div>
-
-            <div class="column has-text-centered">
-              <div class="publication-links">
-                <!-- Arxiv PDF link -->
-                <span class="link-block">
-                  <a href="https://arxiv.org/abs/2410.08631" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
-                    <span class="icon">
-                      <i class="fas fa-file-pdf"></i>
-                    </span>
-                    <span>Paper</span>
-                  </a>
-                </span>
-
-                <!-- Supplementary PDF link -->
-                <!-- <span class="link-block">
-                  <a href="static/pdfs/supplementary_material.pdf" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
-                    <span class="icon">
-                      <i class="fas fa-file-pdf"></i>
-                    </span>
-                    <span>Supplementary</span>
-                  </a>
-                </span> -->
-
-                <!-- Github link -->
-                <span class="link-block">
-                  <a href="https://github.com/bytedance/dplm" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
-                    <span class="icon">
-                      <i class="fab fa-github"></i>
-                    </span>
-                    <span>Code and models will be released</span>
-                  </a>
-                </span>
-
-                <!-- Documentation link -->
-                <!-- <span class="link-block">
-                  <a href="https://byte-research.gitbook.io/cryostar" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
-                    <span class="icon">
-                      <i class="fas fa-book"></i>
-                    </span>
-                    <span>User Guide</span>
-                  </a>
-                </span> -->
-
-                <!-- ArXiv abstract Link -->
-                <!-- <span class="link-block">
-                  <a href="https://arxiv.org/abs/<ARXIV PAPER ID>" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
-                    <span class="icon">
-                      <i class="ai ai-arxiv"></i>
-                    </span>
-                    <span>arXiv</span>
-                  </a>
-                </span> -->
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+<!-- Navigation Bar -->
+<nav class="navbar" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <!-- === UPDATED: Logo Size === -->
+    <a class="navbar-item" href="https://www.bytedance.com/en/" target="_blank">
+       <img src="./res/main_page/bytedance.png"
+            alt="ByteDance Logo"
+            style="height: 32px; padding-right: 10px; vertical-align: middle;"> <!-- Increased height and padding -->
+       <span style="font-weight: bold; vertical-align: middle;">ByteDance Research</span>
+    </a>
+    <!-- === END Logo Size Update === -->
+    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navMenu">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+  <div class="navbar-menu" id="navMenu">
+    <div class="navbar-start" style="flex-grow: 1; justify-content: center;">
+      <!-- === UPDATED: Home Icon Size === -->
+       <a class="navbar-item" href="https://bytedance.github.io/dplm/">
+         <span class="icon is-medium"> <!-- Added is-medium -->
+           <i class="fas fa-home"></i>
+         </span>
+         <span>DPLM Home</span>
+       </a>
+      <!-- === END Home Icon Size Update === -->
+       <div class="navbar-item has-dropdown is-hoverable">
+         <a class="navbar-link"> <!-- Font size increased via CSS -->
+           More Research
+         </a>
+         <div class="navbar-dropdown"> <!-- Font size increased via CSS -->
+           <a class="navbar-item" href="https://bytedance.github.io/dplm/dplm-2.1/" target="_blank">
+             DPLM-2.1
+           </a>
+           <a class="navbar-item" href="https://bytedance.github.io/dplm/dplm-2" target="_blank">
+             DPLM-2
+           </a>
+           <a class="navbar-item" href="https://arxiv.org/abs/2402.18567" target="_blank">
+             DPLM
+           </a>
+         </div>
+       </div>
     </div>
-  </section>
-
-  <section class="hero teaser">
-    <div class="container is-max-desktop">
-      <div class="hero-body">
-        <!-- <img src="https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/cryofm/images/intro.jpg" alt="MAIN_FIGURE" /> -->
-        <!-- <video poster="" id="video" autoplay controls muted loop height="100%">
-          <source src="https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/cryofm/videos/cryofm.mp4" type="video/mp4">
-        </video> -->
-        <img class="center-image-carousel blend-img-background" src="res/dplm-2/main.png">
-        
-        <h2 class="subtitle has-text-justified">
-            DPLM-2 is a brand-new multimodal protein foundation model that extends <a href="https://github.com/bytedance/dplm">Diffusion Protein Language Model (DPLM, ICML'24)</a> to model, understand, generate and reason over both protein structures and sequences. 
-        </h2>
-      </div>
-    </div>
-  </section>
-
-  <!-- Paper abstract -->
-  <section class="section hero is-light">
-    <div class="container is-max-desktop">
-      <div class="columns is-centered has-text-centered">
-        <div class="column is-four-fifths">
-          <h2 class="title is-3">Abstract</h2>
-          <div class="content has-text-justified">
-            <p>
-                Proteins are essential macromolecules defined by their amino acid sequences, which determine their three-dimensional structures and, consequently, their functions in all living organisms. Therefore, generative protein modeling necessitates a multimodal approach to simultaneously model, understand, and generate both sequences and structures. However, existing methods typically use separate models for each modality, limiting their ability to capture the intricate relationships between sequence and structure. This results in suboptimal performance in tasks that requires joint understanding and generation of both modalities.
-
-            <p></p>
-                In this paper, we introduce DPLM-2, a multimodal protein foundation model that extends discrete diffusion protein language model (DPLM) to accommodate both sequences and structures.
-                To enable structural learning with the language model, 3D coordinates are converted to discrete tokens using a lookup-free quantization-based tokenizer.
-                By training on both experimental and high-quality synthetic structures, DPLM-2 learns the joint distribution of sequence and structure, as well as their marginals and conditionals.
-                We also implement an efficient warm-up strategy to exploit the connection between large-scale evolutionary data and structural inductive biases from pre-trained sequence-based protein language models.
-                Empirical evaluation shows that DPLM-2 can simultaneously generate highly compatible amino acid sequences and their corresponding 3D structures eliminating the need for a two-stage generation approach.
-                Moreover, DPLM-2 demonstrates competitive performance in various conditional generation tasks, including folding, inverse folding, and scaffolding with multimodal motif inputs, as well as providing structure-aware representations for predictive tasks.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-  <!-- End paper abstract -->
-
-  <!-- Image carousel
-  <section class="hero is-small">
-    <div class="hero-body">
-      <div class="container" style="width: 960px; max-width: 100%">
-        <h2 class="title has-text-centered">Results on 4 downstream tasks</h2>
-        <div id="results-carousel" class="carousel results-carousel">
-          <div class="item">
-              <img class="center-image-carousel blend-img-background" src="https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/cryofm/images/task1.jpg">
-          </div>
-
-          <div class="item">
-              <img class="center-image-carousel blend-img-background" src="https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/cryofm/images/task2.jpg">
-          </div>
-
-          <div class="item">
-              <img class="center-image-carousel blend-img-background" src="https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/cryofm/images/task3.jpg">
-          </div>
-
-          <div class="item">
-              <img class="center-image-carousel blend-img-background" src="https://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/cryofm/images/task4.jpg">
-          </div>
-
-        </div>
-      </div>
-    </div>
-  </section> -->
-  <!-- End image carousel -->
-
-  <!--BibTex citation -->
-  <section class="section" id="BibTeX">
-    <div class="container is-max-desktop content">
-      <h2 class="title">BibTeX</h2>
-      <pre><code>
-        @article{wang2024dplm2,
-          title={DPLM-2: A Multimodal Diffusion Protein Language Model},
-          author={Xinyou Wang and Zaixiang Zheng and Fei Ye and Dongyu Xue and Shujian Huang and Quanquan Gu},
-          year={2024},
-          eprint={2410.08631},
-          archivePrefix={arXiv},
-          primaryClass={q-bio.BM},
-          url={https://arxiv.org/abs/2410.08631},
-        }
-      </code></pre>
-    </div>
-  </section>
-  <!--End BibTex citation -->
+  </div>
+</nav>
+<!-- End Navigation Bar -->
 
 
-  <footer class="footer">
-    <div class="container">
+<section class="hero is-medium is-bold">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <h1 class="title is-1 dplm-main-title">
+        DPLM: Diffusion Protein Language Model
+      </h1>
+      <h2 class="subtitle is-3">
+        Leading generative performance for protein modeling
+      </h2>
       <div class="columns is-centered">
         <div class="column is-8">
-          <div class="content">
+           <div class="container">
+              <div class="columns is-centered">
+                 <!-- === Code Button remains large === -->
+                 <div class="column has-text-centered">
+                    <a href="https://github.com/bytedance/dplm" target="_blank"
+                       class="external-link button is-large is-rounded button-fancy-code">
+                       <!-- <span class="icon is-medium"><i class="fab fa-github"></i></span> -->
+                       <span>Explore DPLM for Protein Modeling</span>
+                    </a>
+                 </div>
+                 <!-- === END Code Button === -->
+              </div>
+           </div>
+        </div>
+     </div>
+    </div>
+  </div>
+</section>
 
-            <p>
-              This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template"
-                target="_blank">Academic Project Page Template</a> which was adopted from the <a
-                href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
-              You are free to borrow the of this website, we just ask that you link back to this page in the footer.
-              <br> This website is licensed under a <a rel="license"
-                href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
-                Commons Attribution-ShareAlike 4.0 International License</a>.
-            </p>
-
+<!-- Paper Section with Card Grid -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+       <div class="column is-four-fifths has-text-centered">
+          <h2 class="title is-3">Publications from the DPLM Series</h2>
+          <p class="subtitle is-5">Explore our foundational work in generative protein modeling.</p>
+       </div>
+    </div>
+    <div class="columns is-multiline is-centered" style="padding-top: 2rem;">
+      <!-- Cards remain unchanged -->
+      <div class="column is-one-third-desktop is-half-tablet publication-card">
+        <a href="https://bytedance.github.io/dplm/dplm-2.1/" target="_blank">
+          <div class="card">
+            <!-- === WRAPPER ADDED HERE === -->
+            <div class="card-image">
+              <figure class="image">
+                <!-- <video autoplay loop muted playsinline preload="metadata"> -->
+                  <video class="preview z-depth-1 rounded" muted="" playsinline="" autoplay="" loop="" poster="./res/main_page/dplm-2.1.png" preload="auto"> 
+                    <source src="./res/main_page/DPLM-2.1.mp4" type="video/mp4"> 
+                  </video>
+              </figure>
+            </div>
+            <!-- === END WRAPPER === -->
+            <div class="card-content">
+              <p class="title is-5">Elucidating the Design Space of Multimodal Protein Language Models</p>
+              <div class="content"><p>DPLM-2.1 achieves advanced structural modeling capabilities beyond DPLM-2. The proposed designs enable the 650M multimodal PLM to
+                outperform 3B-scale baselines and specialized structure folding models.</p></div>
+            </div>
           </div>
+        </a>
+      </div>
+      <div class="column is-one-third-desktop is-half-tablet publication-card">
+        <a href="https://bytedance.github.io/dplm/dplm-2" target="_blank">
+          <div class="card">
+            <div class="card-image">
+              <!-- <figure class="image"><img src="https://bytedance.github.io/dplm/res/dplm-2/main.png" alt="DPLM-2"></figure> -->
+              <figure class="image"><img src="./res/main_page/DPLM-2.png" alt="DPLM-2"></figure>
+            </div>
+            <div class="card-content">
+              <p class="title is-5">DPLM-2: A Multimodal Diffusion Protein Language Model</p>
+              <div class="content"><p>DPLM-2 is a brand-new multimodal protein foundation model that extends Diffusion Protein Language Model to model, understand, generate and reason over both protein structures and sequences.</p></div>
+            </div>
+          </div>
+        </a>
+      </div>
+      <div class="column is-one-third-desktop is-half-tablet publication-card">
+         <a href="https://arxiv.org/abs/2402.18567" target="_blank">
+          <div class="card">
+            <div class="card-image">
+              <figure class="image"><img src="./res/main_page/dplm.png" alt="Placeholder Image"></figure>
+            </div>
+            <div class="card-content">
+              <p class="title is-5">Diffusion Language Models Are Versatile Protein Learners</p>
+              <div class="content"><p>This paper introduces diffusion protein language model (DPLM), a versatile protein language model that demonstrates strong generative and predictive capabilities for protein sequences.</p></div>
+            </div>
+          </div>
+        </a>
+      </div>
+    </div><!-- End Card Grid -->
+  </div>
+</section>
+<!--/ Paper Section -->
+
+<!-- BibTeX (Commented out) -->
+<!-- <section class="section" id="BibTeX"> ... </section> -->
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content has-text-centered">
+          <p>
+            This website template is based on the <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a> project page.
+          </p>
+          <!-- <p> © 2024 ByteDance Ltd. All rights reserved. </p> -->
         </div>
       </div>
     </div>
-  </footer>
+  </div>
+</footer>
 
-  <!-- Statcounter tracking code -->
-
-  <!-- You can add a tracker to track page visits by creating an account at statcounter.com -->
-
-  <!-- End of Statcounter Code -->
+<!-- Script for Navbar Burger Toggle -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const $navbarBurgers = Array.prototype.slice.call(document.querySelectorAll('.navbar-burger'), 0);
+    if ($navbarBurgers.length > 0) {
+      $navbarBurgers.forEach( el => {
+        el.addEventListener('click', () => {
+          const target = el.dataset.target;
+          const $target = document.getElementById(target);
+          el.classList.toggle('is-active');
+          $target.classList.toggle('is-active');
+        });
+      });
+    }
+  });
+</script>
 
 </body>
-
 </html>

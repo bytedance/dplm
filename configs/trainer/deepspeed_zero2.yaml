@@ -1,9 +1,8 @@
 defaults:
   - default.yaml
 
-accelerator: 'cuda'
-devices: 'auto'
-strategy: 'deepspeed_stage_2'
+accelerator: "cuda"
+devices: "auto"
+strategy: "deepspeed_stage_2"
 precision: 16
-
 # sync_batchnorm: True

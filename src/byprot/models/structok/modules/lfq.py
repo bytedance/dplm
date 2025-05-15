@@ -8,14 +8,12 @@
 # This modified file is released under the same license.
 
 
-"""
-Lookup Free Quantization
-Proposed in https://arxiv.org/abs/2310.05737
+"""Lookup Free Quantization Proposed in https://arxiv.org/abs/2310.05737.
 
 In the simplest setup, each dimension is quantized into {-1, 1}.
 An entropy penalty is used to encourage utilization.
 
-Refer to 
+Refer to
 https://github.com/lucidrains/vector-quantize-pytorch/blob/master/vector_quantize_pytorch/lookup_free_quantization.py
 https://github.com/theAdamColton/ijepa-enhanced/blob/7edef5f7288ae8f537f0db8a10044a2a487f70c9/ijepa_enhanced/lfq.py
 """
@@ -32,7 +30,8 @@ from torch.nn import Module
 # constants
 
 LossBreakdown = namedtuple(
-    "LossBreakdown", ["per_sample_entropy", "codebook_entropy", "commitment", "avg_probs"]
+    "LossBreakdown",
+    ["per_sample_entropy", "codebook_entropy", "commitment", "avg_probs"],
 )
 
 # helper functions
@@ -78,10 +77,9 @@ def mult_along_first_dims(x, y):
 
 
 def masked_mean(x, m):
-    """
-    takes the mean of the elements of x that are not masked
-    the mean is taken along the shared leading dims of m
-    equivalent to: x[m].mean(tuple(range(m.ndim)))
+    """takes the mean of the elements of x that are not masked the mean is
+    taken along the shared leading dims of m equivalent to:
+    x[m].mean(tuple(range(m.ndim)))
 
     The benefit of using masked_mean rather than using
     tensor indexing is that masked_mean is much faster
@@ -102,8 +100,7 @@ def entropy_loss(
     batch_maximization_weight=1.0,
     eps=1e-5,
 ):
-    """
-    Entropy loss of unnormalized logits
+    """Entropy loss of unnormalized logits.
 
     logits: Affinities are over the last dimension
 
@@ -177,14 +174,20 @@ class LFQ(Module):
         self.batch_maximization_weight = batch_maximization_weight
 
         # for no auxiliary loss, during inference
-        self.token_factorization = token_factorization  ## only utilized in second stage
+        self.token_factorization = (
+            token_factorization  ## only utilized in second stage
+        )
         if not self.token_factorization:  # for first stage model
             self.register_buffer(
-                "mask", 2 ** torch.arange(self.codebook_dim - 1, -1, -1), persistent=False
+                "mask",
+                2 ** torch.arange(self.codebook_dim - 1, -1, -1),
+                persistent=False,
             )
         else:
             k = self.codebook_dim // 2
-            self.register_buffer("mask", 2 ** torch.arange(k - 1, -1, -1), persistent=False)
+            self.register_buffer(
+                "mask", 2 ** torch.arange(k - 1, -1, -1), persistent=False
+            )
 
         self.register_buffer("zero", torch.tensor(0.0), persistent=False)
 
@@ -205,7 +208,9 @@ class LFQ(Module):
 
         returns big endian bits
         """
-        mask = 2 ** torch.arange(self.codebook_dim, device=x.device, dtype=torch.long)
+        mask = 2 ** torch.arange(
+            self.codebook_dim, device=x.device, dtype=torch.long
+        )
         # x is now big endian bits, the last dimension being the bits
         x = (x.unsqueeze(-1) & mask) != 0
         return x
@@ -213,10 +218,16 @@ class LFQ(Module):
     def get_codebook_entry(self, x, shape=None):
         if self.token_factorization:
             k = self.codebook_dim // 2
-            mask = 2 ** torch.arange(k - 1, -1, -1, device=x.device, dtype=torch.long)
+            mask = 2 ** torch.arange(
+                k - 1, -1, -1, device=x.device, dtype=torch.long
+            )
         else:
             mask = 2 ** torch.arange(
-                self.codebook_dim - 1, -1, -1, device=x.device, dtype=torch.long
+                self.codebook_dim - 1,
+                -1,
+                -1,
+                device=x.device,
+                dtype=torch.long,
             )
 
         x = (x.unsqueeze(-1) & mask) != 0
@@ -225,7 +236,7 @@ class LFQ(Module):
         # b, n, c = bnc
         # x = rearrange(x, "b (h w) c -> b h w c", h=h, w=w, c=c)
         # x = rearrange(x, "b h w c -> b c h w")
-        return x # (b, n, c)
+        return x  # (b, n, c)
 
     def bits_to_indices(self, bits):
         """
@@ -260,13 +271,13 @@ class LFQ(Module):
 
     def forward(
         self,
-        x, # (b, n, c)
+        x,  # (b, n, c)
         return_loss_breakdown=False,
         mask=None,
         return_loss=True,
     ):
-        """
-        einstein notation
+        """einstein notation.
+
         b - batch
         n - sequence (or flattened spatial dimensions)
         d - feature dimension, which is also log2(codebook size)
@@ -280,21 +291,29 @@ class LFQ(Module):
         x = rearrange(x, "b n (c d) -> b n c d", c=self.num_codebooks)
 
         codebook_value = torch.Tensor([1.0]).to(device=x.device, dtype=x.dtype)
-        quantized = torch.where(x > 0, codebook_value, -codebook_value)  # higher than 0 filled
+        quantized = torch.where(
+            x > 0, codebook_value, -codebook_value
+        )  # higher than 0 filled
 
         # calculate indices
         if self.token_factorization:
             k = self.codebook_dim // 2
             indices_pre = reduce(
-                (quantized[..., :k] > 0).int() * self.mask.int(), "b n c d -> b n c", "sum"
+                (quantized[..., :k] > 0).int() * self.mask.int(),
+                "b n c d -> b n c",
+                "sum",
             )
             indices_post = reduce(
-                (quantized[..., k:] > 0).int() * self.mask.int(), "b n c d -> b n c", "sum"
+                (quantized[..., k:] > 0).int() * self.mask.int(),
+                "b n c d -> b n c",
+                "sum",
             )
             # indices_post = 2**k + indices_post #shifter to the 1024
         else:
             indices = reduce(
-                (quantized > 0).int() * self.mask.int(), "b n c d -> b n c", "sum"
+                (quantized > 0).int() * self.mask.int(),
+                "b n c d -> b n c",
+                "sum",
             )
 
         # entropy aux loss
@@ -302,7 +321,11 @@ class LFQ(Module):
         if self.training and return_loss:
             logits = 2 * einsum("... i d, j d -> ... i j", x, self.codebook)
             # the same as euclidean distance up to a constant
-            per_sample_entropy, codebook_entropy, entropy_aux_loss = entropy_loss(
+            (
+                per_sample_entropy,
+                codebook_entropy,
+                entropy_aux_loss,
+            ) = entropy_loss(
                 logits=logits,
                 mask=mask,
                 sample_minimization_weight=self.sample_minimization_weight,
@@ -359,10 +382,15 @@ class LFQ(Module):
             indices = indices.flatten()
             indices = indices.reshape_as(mask)
 
-        loss = self.commitment_loss_weight * commit_loss + self.entropy_loss_weight * entropy_aux_loss
+        loss = (
+            self.commitment_loss_weight * commit_loss
+            + self.entropy_loss_weight * entropy_aux_loss
+        )
         ret = (quantized, loss, (None, None, indices))
 
         if not return_loss_breakdown:
             return ret
 
-        return ret, LossBreakdown(per_sample_entropy, codebook_entropy, commit_loss, avg_probs)
+        return ret, LossBreakdown(
+            per_sample_entropy, codebook_entropy, commit_loss, avg_probs
+        )

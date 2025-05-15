@@ -95,18 +95,18 @@ repos:
     hooks:
       - id: shellcheck
 
-  # md formatting
-  - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.14
-    hooks:
-      - id: mdformat
-        args: ["--number"]
-        additional_dependencies:
-          - mdformat-gfm
-          - mdformat-tables
-          - mdformat_frontmatter
-          # - mdformat-toc
-          # - mdformat-black
+  # # md formatting
+  # - repo: https://github.com/executablebooks/mdformat
+  #   rev: 0.7.14
+  #   hooks:
+  #     - id: mdformat
+  #       args: ["--number"]
+  #       additional_dependencies:
+  #         - mdformat-gfm
+  #         - mdformat-tables
+  #         - mdformat_frontmatter
+  #         # - mdformat-toc
+  #         # - mdformat-black
 
   # jupyter notebook cell output clearing
   # - repo: https://github.com/kynan/nbstripout

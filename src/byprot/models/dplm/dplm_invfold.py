@@ -2,20 +2,25 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+import math
 from dataclasses import dataclass, field
-from omegaconf import OmegaConf, open_dict
+
+import numpy as np
 import torch
 import torch.nn as nn
+from omegaconf import OmegaConf, open_dict
+from tqdm import tqdm
+
 from byprot import utils
 from byprot.models import register_model
-import math
-from byprot.models.utils import topk_masking, stochastic_sample_from_categorical
 from byprot.models.dplm.modules.dplm_adapter import (
-    DPLMWithConditionalAdatper,
     DPLMWithAdapterConfig,
+    DPLMWithConditionalAdatper,
 )
-import numpy as np
-from tqdm import tqdm
+from byprot.models.utils import (
+    stochastic_sample_from_categorical,
+    topk_masking,
+)
 
 
 @dataclass
@@ -31,15 +36,19 @@ class DPLMInvFoldConfig:
     init_pred_where: bool = True
 
 
-@register_model("cond_dplm")
+@register_model("dplm_invfold")
 class DPLMInvFold(nn.Module):
     _default_cfg = DPLMInvFoldConfig()
 
     def __init__(self, cfg) -> None:
         super().__init__()
 
-        self.encoder = utils.instantiate_from_config(cfg=cfg.encoder, group="model")
-        self.decoder = DPLMWithConditionalAdatper.from_pretrained(cfg=cfg.decoder)
+        self.encoder = utils.instantiate_from_config(
+            cfg=cfg.encoder, group="model"
+        )
+        self.decoder = DPLMWithConditionalAdatper.from_pretrained(
+            cfg=cfg.decoder
+        )
 
         self._update_cfg(cfg)
         self.pad_id = self.decoder.pad_id
@@ -60,9 +69,10 @@ class DPLMInvFold(nn.Module):
         # The net_name should be like:
         # ${name}/checkpoints/last.ckpt
         # and there should be .hydra/config.yaml in the ${name} directory that is automatically generated during training.
-        from byprot.utils.config import load_yaml_config
-        from pathlib import Path
         from collections import OrderedDict
+        from pathlib import Path
+
+        from byprot.utils.config import load_yaml_config
 
         cfg_path = Path(net_name).parents[1]
         cfg_path = Path(cfg_path, ".hydra", "config.yaml")
@@ -70,9 +80,9 @@ class DPLMInvFold(nn.Module):
         cfg.pop("_target_")
         model = cls(cfg)
 
-        pretrained_state_dict = torch.load(net_name, map_location=torch.device("cpu"))[
-            "state_dict"
-        ]
+        pretrained_state_dict = torch.load(
+            net_name, map_location=torch.device("cpu")
+        )["state_dict"]
         new_pretrained_state_dict = OrderedDict()
 
         # remove the module prefix "model."
@@ -114,7 +124,9 @@ class DPLMInvFold(nn.Module):
         if encoder_logits is not None:
             init_pred = encoder_logits.argmax(-1)
             if self.init_pred_where:
-                init_pred = torch.where(batch["coord_mask"], init_pred, batch["tokens"])
+                init_pred = torch.where(
+                    batch["coord_mask"], init_pred, batch["tokens"]
+                )
 
         logits, target, loss_mask, weight = self.decoder.compute_loss(
             batch=batch,
@@ -147,7 +159,9 @@ class DPLMInvFold(nn.Module):
             encoder_out["logits"] = encoder_logits
             encoder_out["init_pred"] = init_pred
         else:
-            encoder_out = self.encoder(batch, return_feats=True, output_logits=False)
+            encoder_out = self.encoder(
+                batch, return_feats=True, output_logits=False
+            )
             encoder_out["coord_mask"] = batch["coord_mask"]
         encoder_out["encoder_attention_mask"] = (
             batch["motif_mask"]
@@ -243,7 +257,8 @@ class DPLMInvFold(nn.Module):
                 prev_token_mask, encoder_out["init_pred"], prev_tokens
             )
             initial_output_scores = torch.zeros(
-                *initial_output_tokens.size(), device=initial_output_tokens.device
+                *initial_output_tokens.size(),
+                device=initial_output_tokens.device,
             )
         else:
             tokens = batch["prev_tokens"]
@@ -256,7 +271,9 @@ class DPLMInvFold(nn.Module):
                 )
 
                 output_tokens = tokens.masked_fill(output_mask, self.mask_id)
-                output_scores = torch.zeros_like(output_tokens, dtype=torch.float)
+                output_scores = torch.zeros_like(
+                    output_tokens, dtype=torch.float
+                )
 
                 # output_tokens = torch.where(output_mask, encoder_out['init_pred'], output_tokens)
                 return output_tokens, output_scores
@@ -276,9 +293,7 @@ class DPLMInvFold(nn.Module):
         max_step,
         noise,
     ):
-        """
-        This function is used to perform reparameterized decoding.
-        """
+        """This function is used to perform reparameterized decoding."""
         # output_tokens: [B, N]
         # output_scores: [B, N]
         # cur_tokens: [B, N]
@@ -300,19 +315,27 @@ class DPLMInvFold(nn.Module):
 
         # compute the cutoff length for denoising top-k positions
         cutoff_len = (
-            non_special_sym_mask.sum(1, keepdim=True).type_as(output_scores) * rate
+            non_special_sym_mask.sum(1, keepdim=True).type_as(output_scores)
+            * rate
         ).long()
         # set the scores of special symbols to a large value so that they will never be selected
-        _scores_for_topk = cur_scores.masked_fill(~non_special_sym_mask, 1000.0)
+        _scores_for_topk = cur_scores.masked_fill(
+            ~non_special_sym_mask, 1000.0
+        )
 
         # the top-k selection can be done in two ways: stochastic by injecting Gumbel noise or deterministic
         if topk_mode.startswith("stochastic"):
             noise_scale = float(topk_mode.replace("stochastic", ""))
             lowest_k_mask = topk_masking(
-                _scores_for_topk, cutoff_len, stochastic=True, temp=noise_scale * rate
+                _scores_for_topk,
+                cutoff_len,
+                stochastic=True,
+                temp=noise_scale * rate,
             )
         elif topk_mode == "deterministic":
-            lowest_k_mask = topk_masking(_scores_for_topk, cutoff_len, stochastic=False)
+            lowest_k_mask = topk_masking(
+                _scores_for_topk, cutoff_len, stochastic=False
+            )
         else:
             raise NotImplementedError
 
@@ -349,11 +372,15 @@ class DPLMInvFold(nn.Module):
         last_mask_position = xt_neq_x0
         masked_to_noise = (~xt_neq_x0 & not_v1_t) | (xt_neq_x0 & not_v2_t)
         if isinstance(noise, torch.Tensor):
-            output_tokens.masked_scatter_(masked_to_noise, noise[masked_to_noise])
+            output_tokens.masked_scatter_(
+                masked_to_noise, noise[masked_to_noise]
+            )
         elif isinstance(noise, (int, float)):
             output_tokens.masked_fill_(masked_to_noise, noise)
         else:
-            raise NotImplementedError("noise should be either a tensor or a scalar")
+            raise NotImplementedError(
+                "noise should be either a tensor or a scalar"
+            )
         output_scores.masked_fill_(masked_to_noise, -math.inf)
 
         masked_to_x0 = xt_neq_x0 & ~not_v2_t
@@ -386,7 +413,10 @@ class DPLMInvFold(nn.Module):
         # 0) encoding
         encoder_out = self.forward_encoder(batch, use_draft_seq=use_draft_seq)
         # 1) initialized from all mask tokens
-        initial_output_tokens, initial_output_scores = self.initialize_output_tokens(
+        (
+            initial_output_tokens,
+            initial_output_scores,
+        ) = self.initialize_output_tokens(
             batch,
             encoder_out=encoder_out,
             partial_masks=partial_masks,
@@ -425,7 +455,11 @@ class DPLMInvFold(nn.Module):
                 prev_decoder_out["output_tokens"], partial_masks=partial_masks
             )
 
-            output_masks, result_tokens, result_scores = self._reparam_decoding(
+            (
+                output_masks,
+                result_tokens,
+                result_scores,
+            ) = self._reparam_decoding(
                 output_tokens=output_tokens.clone(),
                 output_scores=output_scores.clone(),
                 cur_tokens=prev_decoder_out["output_tokens"].clone(),

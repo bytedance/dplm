@@ -4,7 +4,7 @@
 defaults:
   - _self_
   - callbacks: # pytorch-lightning callbacks
-    - default
+      - default
 
   # - trainer: ddp
   - logger: null # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
@@ -23,12 +23,12 @@ train:
   # lightning chooses best weights based on the metric specified in checkpoint callback
   test: True
 
-  debug: false  
+  debug: false
 
   force_restart: false # force to train from scratch
 
   # simply provide checkpoint path to resume training
-  # it can be either an absolute path, 
+  # it can be either an absolute path,
   # or an relative path which will then be inferred from
   # 1) current workding directory (cwd), or
   # 2) checkpoint directory (${paths.ckpt_dir})
@@ -39,7 +39,7 @@ train:
   lr: 1e-3 # learning rate
   monitor: ??? # name of the logged metric which determines when model is improving. Used by scheduler (plateau), checkpointer, and early stopping
   mode: ??? # "max" means higher metric value is better, can be also "min". Used by scheduler (plateau), checkpointer, and early stopping
-  patience: 30 # how many validation epochs of not improving until training stops 
+  patience: 30 # how many validation epochs of not improving until training stops
   val_and_save_every_n_steps: null
 
 print_config: True # pretty print config at the start of the run using Rich library

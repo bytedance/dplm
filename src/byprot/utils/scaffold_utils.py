@@ -1,13 +1,14 @@
-import random
-from pprint import pprint
-import torch
-from byprot import utils
 import os
+import random
+from copy import deepcopy
+from pprint import pprint
+
 import esm
 import esm.inverse_folding
-from byprot.datamodules.dataset.data_utils import PDBDataProcessor
-from copy import deepcopy
+import torch
 
+from byprot import utils
+from byprot.datamodules.dataset.data_utils import PDBDataProcessor
 
 STRUCT_TYPE = 0
 AA_TYPE = 1
@@ -189,7 +190,8 @@ chain_dict = {
 
 
 def get_intervals(list, single_res_domain=False):
-    "Given a list (Tensor) of non-masked residues get new start and end index for motif placed in scaffold"
+    """Given a list (Tensor) of non-masked residues get new start and end index
+    for motif placed in scaffold."""
     if single_res_domain:
         start = [l.item() for l in list]
         stop = start
@@ -207,18 +209,25 @@ def get_intervals(list, single_res_domain=False):
     return start, stop
 
 
-
 def get_motif(pdb_name, ori_pdb_name, mask_token, spacer_list=None):
     # Get motif of sequence from PDB file
     start_idxs = start_idx_dict[pdb_name]
     end_idxs = end_idx_dict[pdb_name]
-        
-    pdb_clean_path = os.path.join('data-bin/scaffolding-pdbs/' + str(pdb_name) + '_clean.pdb')
+
+    pdb_clean_path = os.path.join(
+        "data-bin/scaffolding-pdbs/" + str(pdb_name) + "_clean.pdb"
+    )
     chain = chain_dict[pdb_name]
     chain_ids = [chain]
     print("WARNING: USING CHAIN", chain, "FROM PDB FILE")
-    structure = esm.inverse_folding.util.load_structure(pdb_clean_path, chain_ids)
-    native_seqs = esm.inverse_folding.multichain_util.extract_coords_from_complex(structure)[1]
+    structure = esm.inverse_folding.util.load_structure(
+        pdb_clean_path, chain_ids
+    )
+    native_seqs = (
+        esm.inverse_folding.multichain_util.extract_coords_from_complex(
+            structure
+        )[1]
+    )
     sequence = native_seqs[chain_ids[0]]
     print("sequence extracted from pdb", sequence)
     print("sequence length", len(sequence))
@@ -227,12 +236,12 @@ def get_motif(pdb_name, ori_pdb_name, mask_token, spacer_list=None):
 
     if spacer_list is None:
         spacer_list = []
-    end_idxs = [i+1 for i in end_idxs] # inclusive of final residue
+    end_idxs = [i + 1 for i in end_idxs]  # inclusive of final residue
     if len(start_idxs) > 1:
         motif = []
         for i in range(len(start_idxs)):
-            motif += sequence[start_idxs[i]:end_idxs[i]]
-            if i < (len(start_idxs)-1):
+            motif += sequence[start_idxs[i] : end_idxs[i]]
+            if i < (len(start_idxs) - 1):
                 if spacer_list is None:
                     interval_start = scaffold_interval[ori_pdb_name][i][0]
                     interval_end = scaffold_interval[ori_pdb_name][i][1]
@@ -242,8 +251,8 @@ def get_motif(pdb_name, ori_pdb_name, mask_token, spacer_list=None):
                     spacer = spacer_list[i]
                 motif += [mask_token] * spacer
     else:
-        motif = sequence[start_idxs[0]: end_idxs[0]]
-    print("motif extracted from indexes supplied:", ''.join(motif))
+        motif = sequence[start_idxs[0] : end_idxs[0]]
+    print("motif extracted from indexes supplied:", "".join(motif))
 
     return motif, spacer_list
 
@@ -294,7 +303,11 @@ def get_initial_dplm(args, tokenizer, pdb, ori_pdb, device):
                 scaffold_left[ori_pdb][0], scaffold_left[ori_pdb][1]
             )
 
-            motif = get_motif(pdb_name=pdb, ori_pdb_name=ori_pdb, mask_token=tokenizer.mask_token)
+            motif = get_motif(
+                pdb_name=pdb,
+                ori_pdb_name=ori_pdb,
+                mask_token=tokenizer.mask_token,
+            )
             motif_overall_length = len(motif)
 
             if total_length[ori_pdb] != -1:
@@ -328,9 +341,13 @@ def get_initial_dplm(args, tokenizer, pdb, ori_pdb, device):
                 )
 
             overall_length = (
-                scaffold_left_length + motif_overall_length + scaffold_right_length
+                scaffold_left_length
+                + motif_overall_length
+                + scaffold_right_length
             )
-            scaffold_length_list.append(scaffold_left_length + scaffold_right_length)
+            scaffold_length_list.append(
+                scaffold_left_length + scaffold_right_length
+            )
 
         seq = (
             [tokenizer.mask_token] * scaffold_left_length
@@ -342,7 +359,10 @@ def get_initial_dplm(args, tokenizer, pdb, ori_pdb, device):
         init_seq.append(seq)
 
     batch = tokenizer.batch_encode_plus(
-        init_seq, add_special_tokens=True, padding="longest", return_tensors="pt"
+        init_seq,
+        add_special_tokens=True,
+        padding="longest",
+        return_tensors="pt",
     )
     batch = {
         "input_ids": batch["input_ids"],
@@ -372,7 +392,9 @@ def get_initial_dplm(args, tokenizer, pdb, ori_pdb, device):
 # ====================================================================
 
 
-def get_initial_dplm2(args, aa_seq, struct_seq, tokenizer, pdb, ori_pdb, device):
+def get_initial_dplm2(
+    args, aa_seq, struct_seq, tokenizer, pdb, ori_pdb, device
+):
     init_aa_seq, init_struct_seq, scaffold_length_list = create_init_seq(
         pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args
     )
@@ -380,7 +402,9 @@ def get_initial_dplm2(args, aa_seq, struct_seq, tokenizer, pdb, ori_pdb, device)
     batch = collate(tokenizer, init_aa_seq, init_struct_seq, args, device)
     pprint(batch)
 
-    start_idxs_list, end_idxs_list = create_idxs_list(pdb, tokenizer, batch, args)
+    start_idxs_list, end_idxs_list = create_idxs_list(
+        pdb, tokenizer, batch, args
+    )
 
     batches = create_batches(batch, args)
 
@@ -445,9 +469,13 @@ def create_init_seq(pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args):
                 )
 
             overall_length = (
-                scaffold_left_length + motif_overall_length + scaffold_right_length
+                scaffold_left_length
+                + motif_overall_length
+                + scaffold_right_length
             )
-            scaffold_length_list.append(scaffold_left_length + scaffold_right_length)
+            scaffold_length_list.append(
+                scaffold_left_length + scaffold_right_length
+            )
 
         ## motif aa seq initialization
         seq = (
@@ -459,7 +487,9 @@ def create_init_seq(pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args):
         )
         seq = "".join(seq)
         assert len(
-            tokenizer(seq, add_special_tokens=False, padding=False)["input_ids"]
+            tokenizer(seq, add_special_tokens=False, padding=False)[
+                "input_ids"
+            ]
         ) == (overall_length + 2)
         init_aa_seq.append(seq)
 
@@ -479,7 +509,9 @@ def create_init_seq(pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args):
         )
         seq = "".join(seq)
         assert len(
-            tokenizer(seq, add_special_tokens=False, padding=False)["input_ids"]
+            tokenizer(seq, add_special_tokens=False, padding=False)[
+                "input_ids"
+            ]
         ) == (overall_length + 2)
         init_struct_seq.append(seq)
 
@@ -488,7 +520,10 @@ def create_init_seq(pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args):
 
 def collate(tokenizer, init_aa_seq, init_struct_seq, args, device):
     batch_aa = tokenizer.batch_encode_plus(
-        init_aa_seq, add_special_tokens=False, padding="longest", return_tensors="pt"
+        init_aa_seq,
+        add_special_tokens=False,
+        padding="longest",
+        return_tensors="pt",
     )
     batch_aa = {
         "aa_ids": batch_aa["input_ids"],
@@ -530,7 +565,9 @@ def collate(tokenizer, init_aa_seq, init_struct_seq, args, device):
 
     # create partial mask
     aa_mask_idx = tokenizer.added_tokens_encoder[tokenizer.aa_mask_token]
-    struct_mask_idx = tokenizer.added_tokens_encoder[tokenizer.struct_mask_token]
+    struct_mask_idx = tokenizer.added_tokens_encoder[
+        tokenizer.struct_mask_token
+    ]
     partial_mask = (
         batch["input_ids"].ne(aa_mask_idx)
         & batch["input_ids"].ne(struct_mask_idx)
@@ -560,7 +597,10 @@ def create_idxs_list(pdb, tokenizer, batch, args):
 
     for seq in get_intervals_seqs:
         nonmask_locations = (
-            (seq != mask_id) & (seq != bos_id) & (seq != eos_id) & (seq != pad_id)
+            (seq != mask_id)
+            & (seq != bos_id)
+            & (seq != eos_id)
+            & (seq != pad_id)
         ).nonzero().flatten() - 1
         new_start_idxs, new_end_idxs = get_intervals(
             nonmask_locations, single_res_domain=single_res_domain

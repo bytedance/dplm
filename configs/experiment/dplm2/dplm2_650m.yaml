@@ -22,7 +22,6 @@ datamodule:
   struct_vocab_size: 8192
   max_tokens: 4000
   max_len: 512
-  
 
 model:
   _target_: dplm2
@@ -69,7 +68,7 @@ task:
     type: adamw
     _partial_: true
     lr: ${train.lr}
-    betas: 
+    betas:
       - 0.9
       - 0.98
     weight_decay: 0.01 # 0.0001

@@ -1,6 +1,5 @@
 # This config is highly inspired by the MultiFlow (https://github.com/jasonkyuyim/multiflow) repo.
 
-
 env:
   PROJECT_ROOT: /root/research/projects/ByProt
 
@@ -22,7 +21,7 @@ inference:
 
   input_fasta_dir: /path/to/fasta/dir
 
-  # Directory of software, weights, and outputs.  
+  # Directory of software, weights, and outputs.
   pmpnn_dir: vendor/ProteinMPNN
 
   folding:
@@ -30,7 +29,7 @@ inference:
     folding_model: esmf
     own_device: False
     pmpnn_path: ${..pmpnn_dir}
-    pt_hub_dir: null 
+    pt_hub_dir: null
     colabfold_path: path/to/colabfold-conda/bin/colabfold_batch # for AF2
 
   struct_tokenizer:

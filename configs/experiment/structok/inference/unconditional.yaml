@@ -1,6 +1,5 @@
 # This config is highly inspired by the MultiFlow (https://github.com/jasonkyuyim/multiflow) repo.
 
-
 env:
   PROJECT_ROOT: /root/research/projects/ByProt
 
@@ -24,7 +23,7 @@ inference:
   write_sample_trajectories: False # whether to also save the trajectory of the generation process
   calculate_diversity: True # whether to calculate the diversity of the generated structures
 
-  # Directory of software, weights, and outputs.  
+  # Directory of software, weights, and outputs.
   pmpnn_dir: vendor/ProteinMPNN
 
   folding:

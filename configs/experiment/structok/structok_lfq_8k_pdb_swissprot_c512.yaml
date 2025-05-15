@@ -23,7 +23,7 @@ datamodule:
     eval_max_len: ${.crop_size}
     data_dir: ${paths.data_dir}
     csv_path: ${.data_dir}/metadata.pdb_afdb_cameo.plddt.structok_lfq.csv
-    train_split: [pdb,afdb_swissprot]
+    train_split: [pdb, afdb_swissprot]
     valid_split: [cameo2022]
     load_gvp_feat: false
     filter:
@@ -59,7 +59,7 @@ model:
     freeze: true
   decoder_config:
     input_dim: 128
-    trunk: 
+    trunk:
       num_blocks: 4
       sequence_state_dim: 128
       pairwise_state_dim: 32
@@ -73,16 +73,16 @@ model:
 task:
   _target_: struct_tokenizer/structok
   learning:
-    pretrained_model_path: null 
+    pretrained_model_path: null
     no_pretrained_decoder: false
     restore_optimizer: false
   criterion:
     _target_: byprot.models.structok.modules.loss.StructureVQLoss
     config:
-      rec_loss: 
+      rec_loss:
         eps: 1e-06
         violation:
-          weight: 0.3 
+          weight: 0.3
       codebook_loss:
         weight: 1.0
         num_codes: ${model.codebook_config.num_codes}
@@ -90,7 +90,7 @@ task:
     type: adamw
     _partial_: true
     lr: ${train.lr}
-    betas: 
+    betas:
       - 0.9
       - 0.98
     weight_decay: 0.01

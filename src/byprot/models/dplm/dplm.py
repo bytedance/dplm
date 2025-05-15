@@ -3,12 +3,17 @@
 
 
 import math
+import os
 from dataclasses import dataclass, field
+
 import numpy as np
 import torch
 import torch.nn as nn
-from byprot.models import register_model
 from omegaconf import OmegaConf
+from tqdm import tqdm
+from transformers import AutoConfig, AutoTokenizer
+
+from byprot.models import register_model
 from byprot.models.utils import (
     LoRAConfig,
     NetConfig,
@@ -19,9 +24,6 @@ from byprot.models.utils import (
     top_k_top_p_filtering,
     topk_masking,
 )
-from transformers import AutoTokenizer, AutoConfig
-from tqdm import tqdm
-import os
 
 
 @dataclass
@@ -63,9 +65,10 @@ class DiffusionProteinLanguageModel(nn.Module):
             # The net_name should be like:
             # ${name}/checkpoints/last.ckpt
             # and there should be .hydra/config.yaml in the ${name} directory that is automatically generated during training.
-            from byprot.utils.config import load_yaml_config
-            from pathlib import Path
             from collections import OrderedDict
+            from pathlib import Path
+
+            from byprot.utils.config import load_yaml_config
 
             cfg_path = Path(net_name).parents[1]
             cfg_path = Path(cfg_path, ".hydra", "config.yaml")
@@ -109,7 +112,9 @@ class DiffusionProteinLanguageModel(nn.Module):
 
         # sample t1
         u = torch.rand_like(x_0, dtype=torch.float)
-        t1_mask = (u < (t1 / self.cfg.num_diffusion_timesteps)[:, None]) & maskable_mask
+        t1_mask = (
+            u < (t1 / self.cfg.num_diffusion_timesteps)[:, None]
+        ) & maskable_mask
         x_t1 = x_0.masked_fill(t1_mask, self.mask_id)
 
         # sample t2
@@ -130,7 +135,9 @@ class DiffusionProteinLanguageModel(nn.Module):
     def q_sample(self, x_0, t1, maskable_mask):
         # sample t1
         u = torch.rand_like(x_0, dtype=torch.float)
-        t1_mask = (u < (t1 / self.cfg.num_diffusion_timesteps)[:, None]) & maskable_mask
+        t1_mask = (
+            u < (t1 / self.cfg.num_diffusion_timesteps)[:, None]
+        ) & maskable_mask
         x_t1 = x_0.masked_fill(t1_mask, self.mask_id)
         x_t1 = x_t1.masked_fill(t1_mask, self.mask_id)
 
@@ -167,14 +174,19 @@ class DiffusionProteinLanguageModel(nn.Module):
             # and Algorithm 3 in Zheng et al., 2023 (https://arxiv.org/pdf/2302.05737)
             x_t, t, loss_mask = list(
                 self.q_sample_coupled(
-                    target, t1, t2, maskable_mask=self.get_non_special_sym_mask(target)
+                    target,
+                    t1,
+                    t2,
+                    maskable_mask=self.get_non_special_sym_mask(target),
                 ).values()
             )
             target = target.repeat(2, 1)
         else:
             x_t, t, loss_mask = list(
                 self.q_sample(
-                    target, t1, maskable_mask=self.get_non_special_sym_mask(target)
+                    target,
+                    t1,
+                    maskable_mask=self.get_non_special_sym_mask(target),
                 ).values()
             )
 
@@ -208,9 +220,10 @@ class DiffusionProteinLanguageModel(nn.Module):
             return output_tokens, output_scores
 
     def resample(self, _tokens, _scores, ratio, scale):
-        """
-        Rejection sampling for eliminating the unexpected repeat patterns in generation results, e.g., GGGGG....
-        We first calculate the frequency of all tokens,
+        """Rejection sampling for eliminating the unexpected repeat patterns in
+        generation results, e.g., GGGGG.... We first calculate the frequency of
+        all tokens,
+
         and for the tokens that have a frequency higher than the threshold (length * ratio),
         we mask them and resample conditioning on the remaining tokens.
 
@@ -248,10 +261,12 @@ class DiffusionProteinLanguageModel(nn.Module):
 
         if len(to_be_resample_idx) > 0:
             # Resample the sequences that have tokens with higher frequency than threthold.
-            resample_input = torch.stack(resample_input, dim=0).type_as(_tokens)
-            resample_input_scores = torch.stack(resample_input_scores, dim=0).type_as(
-                _scores
+            resample_input = torch.stack(resample_input, dim=0).type_as(
+                _tokens
             )
+            resample_input_scores = torch.stack(
+                resample_input_scores, dim=0
+            ).type_as(_scores)
             resample_input_mask = (
                 torch.stack(resample_input_mask, dim=0).type_as(_tokens).bool()
             )
@@ -266,10 +281,15 @@ class DiffusionProteinLanguageModel(nn.Module):
             resample_logits[..., self.bos_id] = -math.inf
             resample_logits[..., self.eos_id] = -math.inf
 
-            resample_logits = top_k_top_p_filtering(resample_logits, top_p=0.95)
+            resample_logits = top_k_top_p_filtering(
+                resample_logits, top_p=0.95
+            )
             noise_scale = scale
             assert resample_logits.size(0) == len(to_be_resample_idx)
-            resample_tokens, resample_scores = stochastic_sample_from_categorical(
+            (
+                resample_tokens,
+                resample_scores,
+            ) = stochastic_sample_from_categorical(
                 resample_logits, temperature=0.0, noise_scale=noise_scale
             )
             resample_input.masked_scatter_(
@@ -322,7 +342,9 @@ class DiffusionProteinLanguageModel(nn.Module):
         # logits = top_k_top_p_filtering(logits, top_p=0.95)
 
         if sampling_strategy == "vanilla":
-            _tokens, _scores = sample_from_categorical(logits, temperature=temperature)
+            _tokens, _scores = sample_from_categorical(
+                logits, temperature=temperature
+            )
         elif sampling_strategy == "argmax":
             _scores, _tokens = logits.max(-1)
         elif sampling_strategy == "gumbel_argmax":
@@ -332,7 +354,9 @@ class DiffusionProteinLanguageModel(nn.Module):
             )
 
             if not disable_resample:
-                self.resample(_tokens, _scores, ratio=resample_ratio, scale=1.0)
+                self.resample(
+                    _tokens, _scores, ratio=resample_ratio, scale=1.0
+                )
         else:
             raise NotImplementedError
 
@@ -374,9 +398,7 @@ class DiffusionProteinLanguageModel(nn.Module):
         max_step,
         noise,
     ):
-        """
-        This function is used to perform reparameterized decoding.
-        """
+        """This function is used to perform reparameterized decoding."""
         # output_tokens: [B, N]
         # output_scores: [B, N]
         # cur_tokens: [B, N]
@@ -398,19 +420,27 @@ class DiffusionProteinLanguageModel(nn.Module):
 
         # compute the cutoff length for denoising top-k positions
         cutoff_len = (
-            non_special_sym_mask.sum(1, keepdim=True).type_as(output_scores) * rate
+            non_special_sym_mask.sum(1, keepdim=True).type_as(output_scores)
+            * rate
         ).long()
         # set the scores of special symbols to a large value so that they will never be selected
-        _scores_for_topk = cur_scores.masked_fill(~non_special_sym_mask, 1000.0)
+        _scores_for_topk = cur_scores.masked_fill(
+            ~non_special_sym_mask, 1000.0
+        )
 
         # the top-k selection can be done in two ways: stochastic by injecting Gumbel noise or deterministic
         if topk_mode.startswith("stochastic"):
             noise_scale = float(topk_mode.replace("stochastic", ""))
             lowest_k_mask = topk_masking(
-                _scores_for_topk, cutoff_len, stochastic=True, temp=noise_scale * rate
+                _scores_for_topk,
+                cutoff_len,
+                stochastic=True,
+                temp=noise_scale * rate,
             )
         elif topk_mode == "deterministic":
-            lowest_k_mask = topk_masking(_scores_for_topk, cutoff_len, stochastic=False)
+            lowest_k_mask = topk_masking(
+                _scores_for_topk, cutoff_len, stochastic=False
+            )
         else:
             raise NotImplementedError
 
@@ -447,11 +477,15 @@ class DiffusionProteinLanguageModel(nn.Module):
         last_mask_position = xt_neq_x0
         masked_to_noise = (~xt_neq_x0 & not_v1_t) | (xt_neq_x0 & not_v2_t)
         if isinstance(noise, torch.Tensor):
-            output_tokens.masked_scatter_(masked_to_noise, noise[masked_to_noise])
+            output_tokens.masked_scatter_(
+                masked_to_noise, noise[masked_to_noise]
+            )
         elif isinstance(noise, (int, float)):
             output_tokens.masked_fill_(masked_to_noise, noise)
         else:
-            raise NotImplementedError("noise should be either a tensor or a scalar")
+            raise NotImplementedError(
+                "noise should be either a tensor or a scalar"
+            )
         output_scores.masked_fill_(masked_to_noise, -math.inf)
 
         masked_to_x0 = xt_neq_x0 & ~not_v2_t
@@ -485,7 +519,10 @@ class DiffusionProteinLanguageModel(nn.Module):
         # 0) encoding
         encoder_out = self.forward_encoder(batch)
         # 1) initialized from all mask tokens
-        initial_output_tokens, initial_output_scores = self.initialize_output_tokens(
+        (
+            initial_output_tokens,
+            initial_output_scores,
+        ) = self.initialize_output_tokens(
             batch, encoder_out=encoder_out, partial_masks=partial_masks
         )
         prev_decoder_out = dict(
@@ -523,7 +560,11 @@ class DiffusionProteinLanguageModel(nn.Module):
                 prev_decoder_out["output_tokens"], partial_masks=partial_masks
             )
 
-            output_masks, result_tokens, result_scores = self._reparam_decoding(
+            (
+                output_masks,
+                result_tokens,
+                result_scores,
+            ) = self._reparam_decoding(
                 output_tokens=prev_decoder_out["output_tokens"].clone(),
                 output_scores=prev_decoder_out["output_scores"].clone(),
                 cur_tokens=output_tokens.clone(),

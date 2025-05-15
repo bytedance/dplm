@@ -5,15 +5,16 @@
 from typing import Any, Callable, List, Union
 
 import torch
-from byprot import utils
-from byprot.tasks import TaskLitModule, register_task
-from byprot.utils.config import compose_config as Cfg, merge_config
 from lightning.pytorch.utilities import grad_norm
-
 from omegaconf import DictConfig
 from torch import nn
 from torch.nn import functional as F
 from torchmetrics import CatMetric, MaxMetric, MeanMetric, MinMetric, SumMetric
+
+from byprot import utils
+from byprot.tasks import TaskLitModule, register_task
+from byprot.utils.config import compose_config as Cfg
+from byprot.utils.config import merge_config
 
 log = utils.get_logger(__name__)
 
@@ -66,7 +67,9 @@ class DPLM2TrainingTask(TaskLitModule):
 
     def on_before_optimizer_step(self, optimizer):
         if self.global_rank == 0:
-            grad_norm_dict = grad_norm(self.trainer.strategy.model, norm_type=2)
+            grad_norm_dict = grad_norm(
+                self.trainer.strategy.model, norm_type=2
+            )
             self.log_dict(grad_norm_dict)
 
     def build_model(self):
@@ -76,7 +79,9 @@ class DPLM2TrainingTask(TaskLitModule):
         )
 
     def build_criterion(self):
-        self.criterion = utils.instantiate_from_config(cfg=self.hparams.criterion)
+        self.criterion = utils.instantiate_from_config(
+            cfg=self.hparams.criterion
+        )
         self.criterion.ignore_index = self.tokenizer.pad_token_id
 
     def build_torchmetric(self):
@@ -107,13 +112,13 @@ class DPLM2TrainingTask(TaskLitModule):
             print(f"Unexpected Keys: {unexpected}")
 
     def step(self, batch):
-        """
-        batch is a Dict containing:
-            - corrds: FloatTensor [bsz, len, n_atoms, 3], coordinates of proteins
-            - corrd_mask: BooltTensor [bsz, len], where valid coordinates
-                are set True, otherwise False
-            - lengths: int [bsz, len], protein sequence lengths
-            - tokens: LongTensor [bsz, len], sequence of amino acids
+        """batch is a Dict containing:
+
+        - corrds: FloatTensor [bsz, len, n_atoms, 3], coordinates of proteins
+        - corrd_mask: BooltTensor [bsz, len], where valid coordinates
+            are set True, otherwise False
+        - lengths: int [bsz, len], protein sequence lengths
+        - tokens: LongTensor [bsz, len], sequence of amino acids
         """
         weighting = self.hparams.learning.weight
         logits, target, loss_mask, weights = self.model.compute_loss(
@@ -142,7 +147,9 @@ class DPLM2TrainingTask(TaskLitModule):
             loss = loss * 0
             logging_output["nll_loss"] = logging_output["nll_loss"] * 0
             logging_output["fullseq_loss"] = logging_output["fullseq_loss"] * 0
-            logging_output["fullseq_nll_loss"] = logging_output["fullseq_nll_loss"] * 0
+            logging_output["fullseq_nll_loss"] = (
+                logging_output["fullseq_nll_loss"] * 0
+            )
             logging_output["ppl"] = logging_output["ppl"] * 0
 
         return loss, logging_output
@@ -152,7 +159,11 @@ class DPLM2TrainingTask(TaskLitModule):
 
         # log train metrics
         self.log(
-            "global_step", self.global_step, on_step=True, on_epoch=False, prog_bar=True
+            "global_step",
+            self.global_step,
+            on_step=True,
+            on_epoch=False,
+            prog_bar=True,
         )
         self.log("lr", self.lrate, on_step=True, on_epoch=False, prog_bar=True)
 
@@ -175,7 +186,9 @@ class DPLM2TrainingTask(TaskLitModule):
         # log other metrics
         sample_size = logging_output["sample_size"]
         self.eval_loss.update(loss, weight=sample_size)
-        self.eval_nll_loss.update(logging_output["nll_loss"], weight=sample_size)
+        self.eval_nll_loss.update(
+            logging_output["nll_loss"], weight=sample_size
+        )
 
         for log_key in logging_output:
             if "constant_diff_loss" not in log_key:
@@ -217,7 +230,11 @@ class DPLM2TrainingTask(TaskLitModule):
         self.eval_struct_acc.reset()
 
         self.log(
-            f"{log_key}/loss", eval_loss, on_step=False, on_epoch=True, prog_bar=True
+            f"{log_key}/loss",
+            eval_loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
         )
         self.log(
             f"{log_key}/nll_loss",
@@ -227,7 +244,11 @@ class DPLM2TrainingTask(TaskLitModule):
             prog_bar=True,
         )
         self.log(
-            f"{log_key}/ppl", eval_ppl, on_step=False, on_epoch=True, prog_bar=True
+            f"{log_key}/ppl",
+            eval_ppl,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
         )
 
         self.log(

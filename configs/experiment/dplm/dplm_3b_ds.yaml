@@ -50,7 +50,7 @@ task:
     type: fusedadam
     _partial_: true
     lr: ${train.lr}
-    betas: 
+    betas:
       - 0.9
       - 0.98
     weight_decay: 0.01 # 0.0001

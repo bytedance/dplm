@@ -5,7 +5,7 @@ output_dir=./generation-results/${model_name}_scaffold
 
 mkdir -p generation-results
 
-# Generate scaffold 
+# Generate scaffold
 python scaffold_generate.py \
     --model_name airkingbd/${model_name} \
     --num_seqs 100 \

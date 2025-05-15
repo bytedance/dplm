@@ -27,7 +27,11 @@ def load_vocab_file(vocab_file):
 
 def preprocess_dataset(csv_path, data_bin, split):
     def remove_lowconf_ends(row, threshold=50):
-        aa_seq, ss_seq, plddt = row["aa_seq"], row["struct_seq"], np.array(row["plddt"])
+        aa_seq, ss_seq, plddt = (
+            row["aa_seq"],
+            row["struct_seq"],
+            np.array(row["plddt"]),
+        )
         ss_seq = ss_seq.split(",")
         modeled_idx = np.where(plddt > threshold)[0]
         min_modeled_idx = np.min(modeled_idx)
@@ -49,7 +53,9 @@ def preprocess_dataset(csv_path, data_bin, split):
     afdb["plddt"] = afdb["plddt"].apply(
         lambda l: [float(a) for a in l.split(",") if len(a) > 0]
     )
-    afdb = afdb.apply(lambda row: remove_lowconf_ends(row, threshold=70), axis=1)
+    afdb = afdb.apply(
+        lambda row: remove_lowconf_ends(row, threshold=70), axis=1
+    )
     pdb["plddt"] = pdb["plddt"].apply(
         lambda l: [float(a) for a in l.split(",") if len(a) > 0]
     )
@@ -62,7 +68,10 @@ def preprocess_dataset(csv_path, data_bin, split):
     remaining_set = remaining_set[remaining_set["aa_seq"].str.len() <= 1024]
     remaining_set = remaining_set[
         (remaining_set["split"] == "pdb")
-        | ((remaining_set["avg_plddt"].notna()) & (remaining_set["avg_plddt"] > 85))
+        | (
+            (remaining_set["avg_plddt"].notna())
+            & (remaining_set["avg_plddt"] > 85)
+        )
     ]
     remaining_set["cluster"] = remaining_set["cluster"].apply(lambda x: str(x))
 
@@ -87,7 +96,8 @@ def preprocess_dataset(csv_path, data_bin, split):
 
 
 class SortishSampler(Sampler):
-    """Returns indices such that inputs with similar lengths are close together."""
+    """Returns indices such that inputs with similar lengths are close
+    together."""
 
     def __init__(
         self,
@@ -102,7 +112,9 @@ class SortishSampler(Sampler):
             rank = dist.get_rank()
         self.data = np.argsort(sequence_lengths)
         self.num_replicas = num_replicas
-        self.num_samples = int(math.ceil(len(self.data) * 1.0 / self.num_replicas))
+        self.num_samples = int(
+            math.ceil(len(self.data) * 1.0 / self.num_replicas)
+        )
         self.bucket_size = bucket_size
         n_buckets = int(np.ceil(len(self.data) / self.bucket_size))
         self.data = [
@@ -183,7 +195,10 @@ class ApproxBatchSampler(BatchSampler):
             this_length = min(self.max_len, self.sample_lengths[idx])
             linear = (len(batch) + 1) * max(length, this_length)
             quadratic = (len(batch) + 1) * max(ell_sq, this_length**2)
-            if linear <= self.max_tokens and quadratic < self.max_square_tokens:
+            if (
+                linear <= self.max_tokens
+                and quadratic < self.max_square_tokens
+            ):
                 batch.append(idx)
                 length = max(length, this_length)
                 ell_sq = max(ell_sq, this_length**2)
@@ -226,8 +241,7 @@ class ApproxBatchSampler(BatchSampler):
 
 
 class TokenizedProteinDataset(Dataset):
-    """
-    Dataset that pulls from UniRef/Uniclust downloads.
+    """Dataset that pulls from UniRef/Uniclust downloads.
 
     The data folder should contain the following:
     - 'consensus.fasta': consensus sequences, no line breaks in sequences
@@ -290,7 +304,9 @@ class TokenizedProteinDataset(Dataset):
             # in order to keep the parallelism, start and end position should be same as struct seq
             aatype_tokens = aatype_tokens[start:stop]
         aatype_tokens = (
-            self.tokenizer.aa_cls_token + aatype_tokens + self.tokenizer.aa_eos_token
+            self.tokenizer.aa_cls_token
+            + aatype_tokens
+            + self.tokenizer.aa_eos_token
         )
 
         return_dict = {
@@ -358,7 +374,9 @@ class DPLM2Tokenizer(EsmTokenizer):
     ):
         self.all_tokens = load_vocab_file(vocab_file)
         self._id_to_token = dict(enumerate(self.all_tokens))
-        self._token_to_id = {tok: ind for ind, tok in enumerate(self.all_tokens)}
+        self._token_to_id = {
+            tok: ind for ind, tok in enumerate(self.all_tokens)
+        }
 
         self._aa_cls_token = None
         self._aa_eos_token = None
@@ -478,55 +496,73 @@ class DPLM2Tokenizer(EsmTokenizer):
     @aa_cls_token.setter
     def aa_cls_token(self, value):
         if not isinstance(value, (str, AddedToken)) and value is not None:
-            raise ValueError("Cannot set a non-string value as the aa_cls_token")
+            raise ValueError(
+                "Cannot set a non-string value as the aa_cls_token"
+            )
         self._aa_cls_token = value
 
     @aa_eos_token.setter
     def aa_eos_token(self, value):
         if not isinstance(value, (str, AddedToken)) and value is not None:
-            raise ValueError("Cannot set a non-string value as the aa_eos_token")
+            raise ValueError(
+                "Cannot set a non-string value as the aa_eos_token"
+            )
         self._aa_eos_token = value
 
     @aa_unk_token.setter
     def aa_unk_token(self, value):
         if not isinstance(value, (str, AddedToken)) and value is not None:
-            raise ValueError("Cannot set a non-string value as the aa_unk_token")
+            raise ValueError(
+                "Cannot set a non-string value as the aa_unk_token"
+            )
         self._aa_unk_token = value
 
     @aa_mask_token.setter
     def aa_mask_token(self, value):
         if not isinstance(value, (str, AddedToken)) and value is not None:
-            raise ValueError("Cannot set a non-string value as the aa_mask_token")
+            raise ValueError(
+                "Cannot set a non-string value as the aa_mask_token"
+            )
         self._aa_mask_token = value
 
     @struct_cls_token.setter
     def struct_cls_token(self, value):
         if not isinstance(value, (str, AddedToken)) and value is not None:
-            raise ValueError("Cannot set a non-string value as the struct_cls_token")
+            raise ValueError(
+                "Cannot set a non-string value as the struct_cls_token"
+            )
         self._struct_cls_token = value
 
     @struct_eos_token.setter
     def struct_eos_token(self, value):
         if not isinstance(value, (str, AddedToken)) and value is not None:
-            raise ValueError("Cannot set a non-string value as the struct_eos_token")
+            raise ValueError(
+                "Cannot set a non-string value as the struct_eos_token"
+            )
         self._struct_eos_token = value
 
     @struct_unk_token.setter
     def struct_unk_token(self, value):
         if not isinstance(value, (str, AddedToken)) and value is not None:
-            raise ValueError("Cannot set a non-string value as the struct_unk_token")
+            raise ValueError(
+                "Cannot set a non-string value as the struct_unk_token"
+            )
         self._struct_unk_token = value
 
     @struct_mask_token.setter
     def struct_mask_token(self, value):
         if not isinstance(value, (str, AddedToken)) and value is not None:
-            raise ValueError("Cannot set a non-string value as the struct_mask_token")
+            raise ValueError(
+                "Cannot set a non-string value as the struct_mask_token"
+            )
         self._struct_mask_token = value
 
 
 class DPLM2Collater(object):
     def __init__(self, tokenizer):
-        self.tokenizer = tokenizer  # DPLM2Tokenizer.from_pretrained(vocab_file)
+        self.tokenizer = (
+            tokenizer  # DPLM2Tokenizer.from_pretrained(vocab_file)
+        )
 
     def __call__(self, raw_batch):
         if len(list(zip(*raw_batch))) == 0:

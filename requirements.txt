@@ -54,4 +54,3 @@ sympy
 tmtools
 transformers==4.39.2
 MDAnalysis
-

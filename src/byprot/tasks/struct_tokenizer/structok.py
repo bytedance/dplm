@@ -143,7 +143,11 @@ class StrucTok(TaskLitModule):
         try:
             outputs, codebook_loss, predicted_indices = self.model(batch)
             loss, logging_outputs = self.criterion(
-                outputs, batch, codebook_loss, self.global_step, predicted_indices
+                outputs,
+                batch,
+                codebook_loss,
+                self.global_step,
+                predicted_indices,
             )
         # loss, logging_output = self.criterion(logits, tokens, label_mask=label_mask)
         except:
@@ -157,9 +161,13 @@ class StrucTok(TaskLitModule):
         loss, model_outputs, logging_output = self.step(batch)
         if loss is None:
             try:
-                log.info(f"Error in current training step! csv index: {batch['csv_idx'].tolist()}")
+                log.info(
+                    f"Error in current training step! csv index: {batch['csv_idx'].tolist()}"
+                )
             except:
-                log.info(f"Error in current training step! CAN NOT PRINT batch['csv_idx']!")
+                log.info(
+                    f"Error in current training step! CAN NOT PRINT batch['csv_idx']!"
+                )
             return
 
         # log train metrics
@@ -317,8 +325,9 @@ class StrucTok(TaskLitModule):
 
     # -------# Optimizers & Lr Schedulers #-------- #
     def configure_optimizers(self):
-        """Choose what optimizers and learning-rate schedulers to use in your optimization.
-        Normally you'd need one. But in the case of GANs or similar you might have multiple.
+        """Choose what optimizers and learning-rate schedulers to use in your
+        optimization. Normally you'd need one. But in the case of GANs or
+        similar you might have multiple.
 
         See examples here:
             https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers

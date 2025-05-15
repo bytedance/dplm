@@ -29,7 +29,11 @@ from typing import Optional, Sequence, Tuple
 
 import torch
 import torch.nn as nn
-from openfold.model.primitives import LayerNorm, Linear, ipa_point_weights_init_
+from openfold.model.primitives import (
+    LayerNorm,
+    Linear,
+    ipa_point_weights_init_,
+)
 from openfold.np.residue_constants import (
     restype_atom14_mask,
     restype_atom14_rigid_group_positions,
@@ -41,7 +45,11 @@ from openfold.utils.feats import (
     torsion_angles_to_frames,
 )
 from openfold.utils.rigid_utils import Rigid, Rotation
-from openfold.utils.tensor_utils import dict_multimap, flatten_final_dims, permute_final_dims
+from openfold.utils.tensor_utils import (
+    dict_multimap,
+    flatten_final_dims,
+    permute_final_dims,
+)
 
 from ..nn import TransformerEncoder
 
@@ -77,9 +85,7 @@ class AngleResnetBlock(nn.Module):
 
 
 class AngleResnet(nn.Module):
-    """
-    Implements Algorithm 20, lines 11-14
-    """
+    """Implements Algorithm 20, lines 11-14."""
 
     def __init__(self, c_in, c_hidden, no_blocks, no_angles, epsilon):
         """
@@ -163,9 +169,7 @@ class AngleResnet(nn.Module):
 
 
 class InvariantPointAttention(nn.Module):
-    """
-    Implements Algorithm 22.
-    """
+    """Implements Algorithm 22."""
 
     def __init__(
         self,
@@ -225,7 +229,9 @@ class InvariantPointAttention(nn.Module):
         self.head_weights = nn.Parameter(torch.zeros((no_heads)))
         ipa_point_weights_init_(self.head_weights)
 
-        concat_out_dim = self.no_heads * (self.c_z + self.c_hidden + self.no_v_points * 4)
+        concat_out_dim = self.no_heads * (
+            self.c_z + self.c_hidden + self.no_v_points * 4
+        )
         self.linear_out = Linear(concat_out_dim, self.c_s, init="final")
 
         self.softmax = nn.Softmax(dim=-1)
@@ -285,7 +291,9 @@ class InvariantPointAttention(nn.Module):
         q_pts = r[..., None].apply(q_pts)
 
         # [*, N_res, H, P_q, 3]
-        q_pts = q_pts.view(q_pts.shape[:-2] + (self.no_heads, self.no_qk_points, 3))
+        q_pts = q_pts.view(
+            q_pts.shape[:-2] + (self.no_heads, self.no_qk_points, 3)
+        )
 
         # [*, N_res, H * (P_q + P_v) * 3]
         kv_pts = self.linear_kv_points(s)
@@ -299,7 +307,9 @@ class InvariantPointAttention(nn.Module):
         kv_pts = kv_pts.view(kv_pts.shape[:-2] + (self.no_heads, -1, 3))
 
         # [*, N_res, H, P_q/P_v, 3]
-        k_pts, v_pts = torch.split(kv_pts, [self.no_qk_points, self.no_v_points], dim=-2)
+        k_pts, v_pts = torch.split(
+            kv_pts, [self.no_qk_points, self.no_v_points], dim=-2
+        )
 
         ##########################
         # Compute attention scores
@@ -330,7 +340,9 @@ class InvariantPointAttention(nn.Module):
         head_weights = self.softplus(self.head_weights).view(
             *((1,) * len(pt_att.shape[:-2]) + (-1, 1))
         )
-        head_weights = head_weights * math.sqrt(1.0 / (3 * (self.no_qk_points * 9.0 / 2)))
+        head_weights = head_weights * math.sqrt(
+            1.0 / (3 * (self.no_qk_points * 9.0 / 2))
+        )
         if inplace_safe:
             pt_att *= head_weights
         else:
@@ -364,7 +376,9 @@ class InvariantPointAttention(nn.Module):
         # Compute output
         ################
         # [*, N_res, H, C_hidden]
-        o = torch.matmul(a, v.transpose(-2, -3).to(dtype=a.dtype)).transpose(-2, -3)
+        o = torch.matmul(a, v.transpose(-2, -3).to(dtype=a.dtype)).transpose(
+            -2, -3
+        )
 
         # [*, N_res, H * C_hidden]
         o = flatten_final_dims(o, 2)
@@ -372,7 +386,10 @@ class InvariantPointAttention(nn.Module):
         # [*, H, 3, N_res, P_v]
         if inplace_safe:
             v_pts = permute_final_dims(v_pts, (1, 3, 0, 2))
-            o_pt = [torch.matmul(a, v.to(a.dtype)) for v in torch.unbind(v_pts, dim=-3)]
+            o_pt = [
+                torch.matmul(a, v.to(a.dtype))
+                for v in torch.unbind(v_pts, dim=-3)
+            ]
             o_pt = torch.stack(o_pt, dim=-3)
         else:
             o_pt = torch.sum(
@@ -388,7 +405,9 @@ class InvariantPointAttention(nn.Module):
         o_pt = r[..., None, None].invert_apply(o_pt)
 
         # [*, N_res, H * P_v]
-        o_pt_norm = flatten_final_dims(torch.sqrt(torch.sum(o_pt**2, dim=-1) + self.eps), 2)
+        o_pt_norm = flatten_final_dims(
+            torch.sqrt(torch.sum(o_pt**2, dim=-1) + self.eps), 2
+        )
 
         # [*, N_res, H * P_v, 3]
         o_pt = o_pt.reshape(*o_pt.shape[:-3], -1, 3)
@@ -404,18 +423,16 @@ class InvariantPointAttention(nn.Module):
 
         # [*, N_res, C_s]
         s = self.linear_out(
-            torch.cat((o, *torch.unbind(o_pt, dim=-1), o_pt_norm, o_pair), dim=-1).to(
-                dtype=z[0].dtype
-            )
+            torch.cat(
+                (o, *torch.unbind(o_pt, dim=-1), o_pt_norm, o_pair), dim=-1
+            ).to(dtype=z[0].dtype)
         )
 
         return s
 
 
 class BackboneUpdate(nn.Module):
-    """
-    Implements part of Algorithm 23.
-    """
+    """Implements part of Algorithm 23."""
 
     def __init__(self, c_s):
         """
@@ -578,7 +595,7 @@ class StructureModule(nn.Module):
         self.linear_in = Linear(self.c_s, self.c_s)
 
         # block
-        self.shared_block = True #not separate_block
+        self.shared_block = True  # not separate_block
         if self.shared_block:
             no_blocks = 1
         else:
@@ -603,14 +620,19 @@ class StructureModule(nn.Module):
         self.ipa_dropout = nn.ModuleList(
             [nn.Dropout(self.dropout_rate) for _ in range(no_blocks)]
         )
-        self.layer_norm_ipa = nn.ModuleList([LayerNorm(self.c_s) for _ in range(no_blocks)])
+        self.layer_norm_ipa = nn.ModuleList(
+            [LayerNorm(self.c_s) for _ in range(no_blocks)]
+        )
 
         # framediff style tranformer
         self.seq_tfmr = nn.ModuleList(
             [TransformerEncoder(self.c_s, 4, 4) for _ in range(no_blocks)]
         )
         self.post_tfmr = nn.ModuleList(
-            [Linear(self.c_s, self.c_s, init="final") for _ in range(no_blocks)]
+            [
+                Linear(self.c_s, self.c_s, init="final")
+                for _ in range(no_blocks)
+            ]
         )
 
         self.transition = nn.ModuleList(
@@ -624,7 +646,9 @@ class StructureModule(nn.Module):
             ]
         )
 
-        self.bb_update = nn.ModuleList([BackboneUpdate(self.c_s) for _ in range(no_blocks)])
+        self.bb_update = nn.ModuleList(
+            [BackboneUpdate(self.c_s) for _ in range(no_blocks)]
+        )
 
         self.angle_resnet = nn.ModuleList(
             [
@@ -710,7 +734,9 @@ class StructureModule(nn.Module):
             s = self.layer_norm_ipa[i](s)
 
             # framediff style transformer
-            s = s + self.post_tfmr[i](self.seq_tfmr[i](s, padding_mask=1 - mask)["out"])
+            s = s + self.post_tfmr[i](
+                self.seq_tfmr[i](s, padding_mask=1 - mask)["out"]
+            )
 
             s = self.transition[i](s)
 
@@ -721,11 +747,15 @@ class StructureModule(nn.Module):
             # quaternion-based transformations to rotation-matrix ones
             # here
             backb_to_global = Rigid(
-                Rotation(rot_mats=rigids.get_rots().get_rot_mats(), quats=None),
+                Rotation(
+                    rot_mats=rigids.get_rots().get_rot_mats(), quats=None
+                ),
                 rigids.get_trans(),
             )
 
-            backb_to_global = backb_to_global.scale_translation(self.trans_scale_factor)
+            backb_to_global = backb_to_global.scale_translation(
+                self.trans_scale_factor
+            )
 
             # [*, N, 7, 2]
             unnormalized_angles, angles = self.angle_resnet[i](s, s_initial)
@@ -759,7 +789,9 @@ class StructureModule(nn.Module):
         del z, z_reference_list
 
         if _offload_inference:
-            evoformer_output_dict["pair"] = evoformer_output_dict["pair"].to(s.device)
+            evoformer_output_dict["pair"] = evoformer_output_dict["pair"].to(
+                s.device
+            )
 
         outputs = dict_multimap(torch.stack, outputs)
         outputs["single"] = s
@@ -817,7 +849,9 @@ class StructureModule(nn.Module):
         # Separated purely to make testing less annoying
         return torsion_angles_to_frames(r, alpha, f, self.default_frames)
 
-    def frames_and_literature_positions_to_atom14_pos(self, r, f):  # [*, N, 8]  # [*, N]
+    def frames_and_literature_positions_to_atom14_pos(
+        self, r, f
+    ):  # [*, N, 8]  # [*, N]
         # Lazily initialize the residue constants on the correct device
         self._init_residue_constants(r.get_rots().dtype, r.get_rots().device)
         return frames_and_literature_positions_to_atom14_pos(

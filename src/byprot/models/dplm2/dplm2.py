@@ -12,8 +12,8 @@ import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 
-from byprot.models.dplm2.modules.dplm2_modeling_esm import *
 from byprot.datamodules.dataset.tokenized_protein import DPLM2Tokenizer
+from byprot.models.dplm2.modules.dplm2_modeling_esm import *
 from byprot.models.utils import *
 
 
@@ -32,13 +32,14 @@ class TokenizerConfig:
     vocab_file: str = field(default="airkingbd/dplm2_650m")
     # amino acid tokens (33) + struct tokens (8192) + 4 special struct tokens
     vocab_size: int = field(default=33 + 8192 + 4)
-    
-    
+
+
 @dataclass
 class StructTokenizerConfig:
     enable: bool = field(default=True)
     exp_path: str = field(default="airkingbd/struct_tokenizer")
-    
+
+
 @dataclass
 class DPLM2Config:
     ## DPLM model
@@ -50,7 +51,9 @@ class DPLM2Config:
 
     ## multi-modal training
     training_stage: str = field(default="train_from_dplm")
-    self_mixup: SelfMixupConfig = field(default=SelfMixupConfig()) # training strategy
+    self_mixup: SelfMixupConfig = field(
+        default=SelfMixupConfig()
+    )  # training strategy
     single_modality_ratio: float = field(default=0.25)
     folding_loss_ratio: float = field(default=0.25)
     inverse_folding_loss_ratio: float = field(default=0.25)
@@ -58,7 +61,9 @@ class DPLM2Config:
     independent_loss_ratio: float = field(default=0.0)
 
     ## struct tokenizer
-    struct_tokenizer: StructTokenizerConfig = field(default=StructTokenizerConfig())
+    struct_tokenizer: StructTokenizerConfig = field(
+        default=StructTokenizerConfig()
+    )
 
 
 @register_model("dplm2")
@@ -68,12 +73,14 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
     def __init__(self, cfg, net=None):
         super().__init__()
         self._update_cfg(cfg)
-        self.tokenizer = DPLM2Tokenizer.from_pretrained(self.cfg.tokenizer.vocab_file)
+        self.tokenizer = DPLM2Tokenizer.from_pretrained(
+            self.cfg.tokenizer.vocab_file
+        )
         self._prepare_special_token()
         self.cfg.tokenizer.vocab_size = len(self.tokenizer)
         if net is None:
-            self.net = get_net_dplm2(self.cfg)  
-        else: 
+            self.net = get_net_dplm2(self.cfg)
+        else:
             if "bit" in net.config.dplm_type:
                 raise ValueError(
                     f"Bit model is not supported in this DPLM-2 class, please use DPLM-2 bit model instead."
@@ -88,7 +95,7 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
     def _update_cfg(self, cfg):
         self.cfg = OmegaConf.merge(self._default_cfg, cfg)
-       
+
     @property
     def special_token_list(self):
         return [
@@ -106,8 +113,8 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             self.aa_U_id,
             self.aa_Z_id,
             self.aa_O_id,
-        ] 
-        
+        ]
+
     @classmethod
     def from_pretrained(
         cls, net_name, cfg_override={}, net_override={}, from_huggingface=True
@@ -140,8 +147,12 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             # remove the module prefix "model."
             for k, v in pretrained_state_dict.items():
                 new_pretrained_state_dict[k[6:]] = v
-            missing, unexpected = model.load_state_dict(new_pretrained_state_dict, strict=False) 
-            print(f"Restored from {net_name} with {len(missing)} missing and {len(unexpected)} unexpected keys")
+            missing, unexpected = model.load_state_dict(
+                new_pretrained_state_dict, strict=False
+            )
+            print(
+                f"Restored from {net_name} with {len(missing)} missing and {len(unexpected)} unexpected keys"
+            )
             if len(missing) > 0:
                 print(f"Missing Keys: {missing}")
                 print(f"Unexpected Keys: {unexpected}")
@@ -186,12 +197,10 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
     @property
     def struct_tokenizer(self):
         if not exists(self._struct_tokenizer):
-            print(
-                f"Loading struct_tokenizer..."
-            )
-            self._struct_tokenizer = get_struct_tokenizer(self.cfg.struct_tokenizer.exp_path).to(
-                self.device
-            )
+            print(f"Loading struct_tokenizer...")
+            self._struct_tokenizer = get_struct_tokenizer(
+                self.cfg.struct_tokenizer.exp_path
+            ).to(self.device)
         return self._struct_tokenizer
 
     def q_sample(self, x_0, t, type_ids, maskable_mask):
@@ -200,7 +209,9 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
         # sample x_t
         u = torch.rand_like(x_0, dtype=torch.float)
-        t_mask = (u < (t / self.cfg.num_diffusion_timesteps)[:, None]) & maskable_mask
+        t_mask = (
+            u < (t / self.cfg.num_diffusion_timesteps)[:, None]
+        ) & maskable_mask
         x_t = x_0.masked_fill(t_mask & aa_position, self.aa_mask_id)
         x_t = x_t.masked_fill(t_mask & struct_position, self.struct_mask_id)
 
@@ -223,23 +234,31 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
         L = input_ids.shape[1]
         num_heads = self.net.config.num_attention_heads
         # [B, num_heads, L+2, L+2]
-        attention_bias: torch.FloatType = self.net.esm.get_extended_attention_mask(
-            input_mask, input_ids.shape
-        ).repeat(
-            1, num_heads, L, 1
+        attention_bias: torch.FloatType = (
+            self.net.esm.get_extended_attention_mask(
+                input_mask, input_ids.shape
+            ).repeat(1, num_heads, L, 1)
         )  # -inf for padding positions, 0 otherwise
 
         if "single_modality" in kwargs:
             single_modality_index = kwargs["single_modality"]
-            struct_attention_bias, aa_attention_bias = attention_bias.chunk(2, dim=-2)
-            struct_attention_bias[single_modality_index, :, :, L // 2 :] = -math.inf
-            aa_attention_bias[single_modality_index, :, :, : L // 2] = -math.inf
+            struct_attention_bias, aa_attention_bias = attention_bias.chunk(
+                2, dim=-2
+            )
+            struct_attention_bias[
+                single_modality_index, :, :, L // 2 :
+            ] = -math.inf
+            aa_attention_bias[
+                single_modality_index, :, :, : L // 2
+            ] = -math.inf
             attention_bias = torch.concat(
                 [struct_attention_bias, aa_attention_bias], dim=-2
             )
 
         # [B, L, d_model]
-        input_embeds = self.net.esm.embeddings(input_ids, attention_mask=input_mask)
+        input_embeds = self.net.esm.embeddings(
+            input_ids, attention_mask=input_mask
+        )
 
         outputs = self.net(
             input_ids=input_ids,
@@ -309,7 +328,9 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
         bool_index_list = []
         for int_index in int_index_list:
-            bool_index = torch.zeros(bsz, dtype=torch.bool).to(struct_target.device)
+            bool_index = torch.zeros(bsz, dtype=torch.bool).to(
+                struct_target.device
+            )
             bool_index[int_index] = True
             bool_index_list.append(bool_index)
 
@@ -349,9 +370,11 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
         struct_target = batch["struct_tokens"]["targets"]
         aatype_target = batch["aatype_tokens"]["targets"]
 
-        struct_noised, aatype_noised, single_modality_index = self.construct_x_t(
-            struct_target, aatype_target
-        )
+        (
+            struct_noised,
+            aatype_noised,
+            single_modality_index,
+        ) = self.construct_x_t(struct_target, aatype_target)
         x_t = torch.concat([struct_noised["x_t"], aatype_noised["x_t"]], dim=1)
         if self.cfg.self_mixup.enable:
             # 1. first part: masked prediction
@@ -362,7 +385,9 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
                 lm_logits = model_outputs["logits"]
             # 2. mixup: alternate mask with model prediction and gt with masks
             prev_input_ids = x_t
-            non_special_sym_mask = self.get_non_special_symbol_mask(prev_input_ids)
+            non_special_sym_mask = self.get_non_special_symbol_mask(
+                prev_input_ids
+            )
             model_pred = torch.where(
                 non_special_sym_mask, lm_logits.argmax(dim=-1), prev_input_ids
             )
@@ -374,9 +399,13 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
             # # 3. second part: denoising + masked prediction
             model_outputs = self.forward(
-                input_ids=mixup_input_ids, single_modality=single_modality_index
+                input_ids=mixup_input_ids,
+                single_modality=single_modality_index,
             )
-            struct_noised["mask"], aatype_noised["mask"] = mixup_loss_mask.chunk(2, dim=1)
+            (
+                struct_noised["mask"],
+                aatype_noised["mask"],
+            ) = mixup_loss_mask.chunk(2, dim=1)
         else:
             model_outputs = self.forward(
                 input_ids=x_t,
@@ -402,13 +431,22 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
         aatype_weight = aatype_weight.expand(aatype_target.size())
 
         return (
-            {"aatype": aatype_logits, "struct": struct_logits}, # model pred logits
-            {"aatype": aatype_target, "struct": struct_target}, # training targets
-            {                                                   # training loss mask
+            {
+                "aatype": aatype_logits,
+                "struct": struct_logits,
+            },  # model pred logits
+            {
+                "aatype": aatype_target,
+                "struct": struct_target,
+            },  # training targets
+            {  # training loss mask
                 "aatype": aatype_noised["mask"],
                 "struct": struct_noised["mask"],
             },
-            {"aatype": aatype_weight, "struct": struct_weight}, # training loss weight
+            {
+                "aatype": aatype_weight,
+                "struct": struct_weight,
+            },  # training loss weight
         )
 
     def forward_encoder(self, input_tokens, **kwargs):
@@ -450,9 +488,7 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
         )
         net_out = self.forward(input_ids=output_tokens)
 
-        logits = net_out["logits"].log_softmax(
-            dim=-1
-        )
+        logits = net_out["logits"].log_softmax(dim=-1)
         attentions = net_out["attentions"] if need_attn_weights else None
 
         if logits.dtype != output_scores.dtype:
@@ -479,14 +515,22 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             _tokens, _scores = stochastic_sample_from_categorical(
                 logits, temperature=0.0, noise_scale=noise_scale
             )
-            _tokens.masked_scatter_(~output_masks, output_tokens[~output_masks])
+            _tokens.masked_scatter_(
+                ~output_masks, output_tokens[~output_masks]
+            )
         elif sampling_strategy.startswith("annealing"):
-            max_temp, min_temp = map(float, sampling_strategy.split("@")[1].split(":"))
+            max_temp, min_temp = map(
+                float, sampling_strategy.split("@")[1].split(":")
+            )
             rate = 1 - step / max_step
             temperature = min_temp + (max_temp - min_temp) * rate
-            _tokens, _scores = sample_from_categorical(logits, temperature=temperature)
+            _tokens, _scores = sample_from_categorical(
+                logits, temperature=temperature
+            )
         else:
-            _tokens, _scores = sample_from_categorical(logits, temperature=temperature)
+            _tokens, _scores = sample_from_categorical(
+                logits, temperature=temperature
+            )
 
         output_tokens.masked_scatter_(output_masks, _tokens[output_masks])
         output_scores.masked_scatter_(output_masks, _scores[output_masks])
@@ -537,8 +581,8 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             noise,
             non_special_sym_mask,
         ):
-            """
-            This function is used to perform reparameterized decoding.
+            """This function is used to perform reparameterized decoding.
+
             output_tokens: [B, N]
             output_scores: [B, N]
             cur_tokens: [B, N]
@@ -561,10 +605,15 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
             # compute the cutoff length for denoising top-k positions
             cutoff_len = (
-                non_special_sym_mask.sum(1, keepdim=True).type_as(output_scores) * rate
+                non_special_sym_mask.sum(1, keepdim=True).type_as(
+                    output_scores
+                )
+                * rate
             ).long()
             # set the scores of special symbols to a large value so that they will never be selected
-            _scores_for_topk = cur_scores.masked_fill(~non_special_sym_mask, 1000.0)
+            _scores_for_topk = cur_scores.masked_fill(
+                ~non_special_sym_mask, 1000.0
+            )
 
             # the top-k selection can be done in two ways: stochastic by injecting Gumbel noise or deterministic
             if topk_mode.startswith("stochastic"):
@@ -625,16 +674,24 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
             masked_to_noise = (~xt_neq_x0 & not_v1_t) | (xt_neq_x0 & not_v2_t)
             if isinstance(noise, torch.Tensor):
-                output_tokens.masked_scatter_(masked_to_noise, noise[masked_to_noise])
+                output_tokens.masked_scatter_(
+                    masked_to_noise, noise[masked_to_noise]
+                )
             elif isinstance(noise, (int, float)):
                 output_tokens.masked_fill_(masked_to_noise, noise)
             else:
-                raise NotImplementedError("noise should be either a tensor or a scalar")
+                raise NotImplementedError(
+                    "noise should be either a tensor or a scalar"
+                )
             output_scores.masked_fill_(masked_to_noise, -math.inf)
 
             masked_to_x0 = xt_neq_x0 & ~not_v2_t
-            output_tokens.masked_scatter_(masked_to_x0, cur_tokens[masked_to_x0])
-            output_scores.masked_scatter_(masked_to_x0, cur_scores[masked_to_x0])
+            output_tokens.masked_scatter_(
+                masked_to_x0, cur_tokens[masked_to_x0]
+            )
+            output_scores.masked_scatter_(
+                masked_to_x0, cur_scores[masked_to_x0]
+            )
             assert ((masked_to_x0 & last_mask_position) == masked_to_x0).all()
             # b_{t} = (b_{t+1} & u_t) | v_t
             # For convenience, save the NOT of b_t for the next iteration
@@ -661,7 +718,11 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
                 non_special_sym_mask=aa_position,
             )
         if struct_position.any():
-            new_xt_neq_x0_struct, output_tokens, output_scores = _reparam_process(
+            (
+                new_xt_neq_x0_struct,
+                output_tokens,
+                output_scores,
+            ) = _reparam_process(
                 output_tokens=output_tokens,
                 output_scores=output_scores,
                 cur_tokens=cur_tokens,
@@ -689,7 +750,10 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
         # 0) encoding
         encoder_out = self.forward_encoder(input_tokens)
         # 1) initialized from all mask tokens
-        initial_output_tokens, initial_output_scores = self.initialize_output_tokens(
+        (
+            initial_output_tokens,
+            initial_output_scores,
+        ) = self.initialize_output_tokens(
             input_tokens, encoder_out=encoder_out, partial_masks=partial_masks
         )
         prev_decoder_out = dict(
@@ -725,7 +789,11 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
                 prev_decoder_out["output_tokens"], partial_masks=partial_masks
             )
 
-            output_masks, result_tokens, result_scores = self._reparam_decoding(
+            (
+                output_masks,
+                result_tokens,
+                result_scores,
+            ) = self._reparam_decoding(
                 output_tokens=prev_decoder_out["output_tokens"].clone(),
                 output_scores=prev_decoder_out["output_scores"].clone(),
                 cur_tokens=output_tokens.clone(),

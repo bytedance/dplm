@@ -2,7 +2,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 model_name=dplm_650m
 
-python ../generate.py \
+python generate.py \
     --model_name airkingbd/${model_name} \
     --seq_lens 100 200 300 400 500 \
     --saveto generation-results/${model_name}

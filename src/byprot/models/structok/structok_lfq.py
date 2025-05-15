@@ -3,6 +3,7 @@
 
 
 import os
+
 import torch
 from torch import nn
 
@@ -120,11 +121,11 @@ class VQModel(nn.Module):
         quant, loss, (_, _, struct_tokens) = self.quantize(
             pre_quant, mask=batch["res_mask"].bool()
         )
-        
+
         struct_feat = quant
-            
+
         decoder_out = self.decode(
-            quant=struct_feat, #quant,
+            quant=struct_feat,  # quant,
             aatype=batch["aatype"],
             mask=batch["res_mask"],
             decoder_kwargs=decoder_kwargs,
@@ -234,8 +235,12 @@ class VQModel(nn.Module):
         device = struct_tokens.device
 
         if not exists(res_mask):
-            res_mask = torch.ones(struct_tokens.shape[:2], dtype=torch.float32, device=device)
-        _aatypes = torch.zeros(struct_tokens.shape[:2], dtype=torch.int64, device=device)
+            res_mask = torch.ones(
+                struct_tokens.shape[:2], dtype=torch.float32, device=device
+            )
+        _aatypes = torch.zeros(
+            struct_tokens.shape[:2], dtype=torch.int64, device=device
+        )
 
         decoder_out = self.decode(
             quant=quant, aatype=_aatypes, mask=res_mask, decoder_kwargs=kwargs
@@ -260,9 +265,7 @@ class VQModel(nn.Module):
     def init_data(self, raw_batch):
         return collate_fn(raw_batch)
 
-    def output_to_pdb(
-        self, decoder_out, output_dir, is_trajectory=False
-    ):
+    def output_to_pdb(self, decoder_out, output_dir, is_trajectory=False):
         decoder_out = {
             kk: vv for kk, vv in decoder_out.items() if not kk == "sm"
         }

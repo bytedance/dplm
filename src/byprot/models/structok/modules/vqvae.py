@@ -68,7 +68,9 @@ class VectorQuantizer(nn.Module):
         # find closest encodings
         min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1)
 
-        min_encodings = torch.zeros(min_encoding_indices.shape[0], self.n_e).to(z)
+        min_encodings = torch.zeros(
+            min_encoding_indices.shape[0], self.n_e
+        ).to(z)
         min_encodings.scatter_(1, min_encoding_indices, 1)
 
         # dtype min encodings: torch.float32
@@ -121,11 +123,11 @@ class VectorQuantizer(nn.Module):
 
 
 class GumbelQuantize(nn.Module):
-    """
-    credit to @karpathy: https://github.com/karpathy/deep-vector-quantization/blob/main/model.py (thanks!)
-    Gumbel Softmax trick quantizer
-    Categorical Reparameterization with Gumbel-Softmax, Jang et al. 2016
-    https://arxiv.org/abs/1611.01144
+    """credit to @karpathy: https://github.com/karpathy/deep-vector-
+    quantization/blob/main/model.py (thanks!) Gumbel Softmax trick quantizer
+    Categorical Reparameterization with Gumbel-Softmax, Jang et al.
+
+    2016 https://arxiv.org/abs/1611.01144
     """
 
     def __init__(
@@ -158,7 +160,9 @@ class GumbelQuantize(nn.Module):
         if self.remap is not None:
             self.register_buffer("used", torch.tensor(np.load(self.remap)))
             self.re_embed = self.used.shape[0]
-            self.unknown_index = unknown_index  # "random" or "extra" or integer
+            self.unknown_index = (
+                unknown_index  # "random" or "extra" or integer
+            )
             if self.unknown_index == "extra":
                 self.unknown_index = self.re_embed
                 self.re_embed = self.re_embed + 1
@@ -178,9 +182,9 @@ class GumbelQuantize(nn.Module):
         new = match.argmax(-1)
         unknown = match.sum(2) < 1
         if self.unknown_index == "random":
-            new[unknown] = torch.randint(0, self.re_embed, size=new[unknown].shape).to(
-                device=new.device
-            )
+            new[unknown] = torch.randint(
+                0, self.re_embed, size=new[unknown].shape
+            ).to(device=new.device)
         else:
             new[unknown] = self.unknown_index
         return new.reshape(ishape)
@@ -211,12 +215,17 @@ class GumbelQuantize(nn.Module):
             # go back to all entries but unused set to zero
             full_zeros[:, self.used, ...] = soft_one_hot
             soft_one_hot = full_zeros
-        z_q = einsum("b n h w, n d -> b d h w", soft_one_hot, self.embed.weight)
+        z_q = einsum(
+            "b n h w, n d -> b d h w", soft_one_hot, self.embed.weight
+        )
 
         # + kl divergence to the prior loss
         qy = F.softmax(logits, dim=1)
         diff = (
-            self.kl_weight * torch.sum(qy * torch.log(qy * self.n_embed + 1e-10), dim=1).mean()
+            self.kl_weight
+            * torch.sum(
+                qy * torch.log(qy * self.n_embed + 1e-10), dim=1
+            ).mean()
         )
 
         ind = soft_one_hot.argmax(dim=1)
@@ -234,15 +243,21 @@ class GumbelQuantize(nn.Module):
         indices = rearrange(indices, "(b h w) -> b h w", b=b, h=h, w=w)
         if self.remap is not None:
             indices = self.unmap_to_all(indices)
-        one_hot = F.one_hot(indices, num_classes=self.n_embed).permute(0, 3, 1, 2).float()
+        one_hot = (
+            F.one_hot(indices, num_classes=self.n_embed)
+            .permute(0, 3, 1, 2)
+            .float()
+        )
         z_q = einsum("b n h w, n d -> b d h w", one_hot, self.embed.weight)
         return z_q
 
 
 class VectorQuantizer2(nn.Module):
-    """
-    Improved version over VectorQuantizer, can be used as a drop-in replacement. Mostly
-    avoids costly matrix multiplications and allows for post-hoc remapping of indices.
+    """Improved version over VectorQuantizer, can be used as a drop-in
+    replacement.
+
+    Mostly avoids costly matrix multiplications and allows for post-hoc
+    remapping of indices.
     """
 
     # NOTE: due to a bug the beta term was applied to the wrong term. for
@@ -273,7 +288,9 @@ class VectorQuantizer2(nn.Module):
         if self.remap is not None:
             self.register_buffer("used", torch.tensor(np.load(self.remap)))
             self.re_embed = self.used.shape[0]
-            self.unknown_index = unknown_index  # "random" or "extra" or integer
+            self.unknown_index = (
+                unknown_index  # "random" or "extra" or integer
+            )
             if self.unknown_index == "extra":
                 self.unknown_index = self.re_embed
                 self.re_embed = self.re_embed + 1
@@ -295,9 +312,9 @@ class VectorQuantizer2(nn.Module):
         new = match.argmax(-1)
         unknown = match.sum(2) < 1
         if self.unknown_index == "random":
-            new[unknown] = torch.randint(0, self.re_embed, size=new[unknown].shape).to(
-                device=new.device
-            )
+            new[unknown] = torch.randint(
+                0, self.re_embed, size=new[unknown].shape
+            ).to(device=new.device)
         else:
             new[unknown] = self.unknown_index
         return new.reshape(ishape)
@@ -312,10 +329,18 @@ class VectorQuantizer2(nn.Module):
         back = torch.gather(used[None, :][inds.shape[0] * [0], :], 1, inds)
         return back.reshape(ishape)
 
-    def forward(self, z, mask, temp=None, rescale_logits=False, return_logits=False):
-        assert temp is None or temp == 1.0, "Only for interface compatible with Gumbel"
-        assert rescale_logits == False, "Only for interface compatible with Gumbel"
-        assert return_logits == False, "Only for interface compatible with Gumbel"
+    def forward(
+        self, z, mask, temp=None, rescale_logits=False, return_logits=False
+    ):
+        assert (
+            temp is None or temp == 1.0
+        ), "Only for interface compatible with Gumbel"
+        assert (
+            rescale_logits == False
+        ), "Only for interface compatible with Gumbel"
+        assert (
+            return_logits == False
+        ), "Only for interface compatible with Gumbel"
         # reshape z -> (batch, height, width, channel) and flatten
         # z = rearrange(z, 'b c h w -> b h w c').contiguous()
         z = rearrange(z, "b l c -> b l c").contiguous()
@@ -327,7 +352,9 @@ class VectorQuantizer2(nn.Module):
             + torch.sum(self.embedding.weight**2, dim=1)
             - 2
             * torch.einsum(
-                "bd,dn->bn", z_flattened, rearrange(self.embedding.weight, "n d -> d n")
+                "bd,dn->bn",
+                z_flattened,
+                rearrange(self.embedding.weight, "n d -> d n"),
             )
         )
 
@@ -347,13 +374,13 @@ class VectorQuantizer2(nn.Module):
             # loss = self.beta * torch.mean((z_q.detach() - z) ** 2) + torch.mean(
             #     (z_q - z.detach()) ** 2
             # )
-            loss = self.beta * _masked_mean((z_q.detach() - z) ** 2, mask) + _masked_mean(
-                (z_q - z.detach()) ** 2, mask
-            )
+            loss = self.beta * _masked_mean(
+                (z_q.detach() - z) ** 2, mask
+            ) + _masked_mean((z_q - z.detach()) ** 2, mask)
         else:
-            loss = torch.mean((z_q.detach() - z) ** 2) + self.beta * torch.mean(
-                (z_q - z.detach()) ** 2
-            )
+            loss = torch.mean(
+                (z_q.detach() - z) ** 2
+            ) + self.beta * torch.mean((z_q - z.detach()) ** 2)
 
         # preserve gradients
         z_q = z + (z_q - z).detach()
@@ -367,12 +394,16 @@ class VectorQuantizer2(nn.Module):
                 z.shape[0], -1
             )  # add batch axis
             min_encoding_indices = self.remap_to_used(min_encoding_indices)
-            min_encoding_indices = min_encoding_indices.reshape(-1, 1)  # flatten
+            min_encoding_indices = min_encoding_indices.reshape(
+                -1, 1
+            )  # flatten
 
         if self.sane_index_shape:
             # min_encoding_indices = min_encoding_indices.reshape(
             #     z_q.shape[0], z_q.shape[2], z_q.shape[3])
-            min_encoding_indices = min_encoding_indices.reshape(z_q.shape[0], z_q.shape[1])
+            min_encoding_indices = min_encoding_indices.reshape(
+                z_q.shape[0], z_q.shape[1]
+            )
 
         return z_q, loss, (perplexity, min_encodings, min_encoding_indices)
 
@@ -401,7 +432,9 @@ class EmbeddingEMA(nn.Module):
         self.eps = eps
         weight = torch.randn(num_tokens, codebook_dim)
         self.weight = nn.Parameter(weight, requires_grad=False)
-        self.cluster_size = nn.Parameter(torch.zeros(num_tokens), requires_grad=False)
+        self.cluster_size = nn.Parameter(
+            torch.zeros(num_tokens), requires_grad=False
+        )
         self.embed_avg = nn.Parameter(weight.clone(), requires_grad=False)
         self.update = True
 
@@ -409,10 +442,14 @@ class EmbeddingEMA(nn.Module):
         return F.embedding(embed_id, self.weight)
 
     def cluster_size_ema_update(self, new_cluster_size):
-        self.cluster_size.data.mul_(self.decay).add_(new_cluster_size, alpha=1 - self.decay)
+        self.cluster_size.data.mul_(self.decay).add_(
+            new_cluster_size, alpha=1 - self.decay
+        )
 
     def embed_avg_ema_update(self, new_embed_avg):
-        self.embed_avg.data.mul_(self.decay).add_(new_embed_avg, alpha=1 - self.decay)
+        self.embed_avg.data.mul_(self.decay).add_(
+            new_embed_avg, alpha=1 - self.decay
+        )
 
     def weight_update(self, num_tokens):
         n = self.cluster_size.sum()
@@ -439,13 +476,17 @@ class EMAVectorQuantizer(nn.Module):
         self.codebook_dim = codebook_dim
         self.num_tokens = num_tokens
         self.beta = beta
-        self.embedding = EmbeddingEMA(self.num_tokens, self.codebook_dim, decay, eps)
+        self.embedding = EmbeddingEMA(
+            self.num_tokens, self.codebook_dim, decay, eps
+        )
 
         self.remap = remap
         if self.remap is not None:
             self.register_buffer("used", torch.tensor(np.load(self.remap)))
             self.re_embed = self.used.shape[0]
-            self.unknown_index = unknown_index  # "random" or "extra" or integer
+            self.unknown_index = (
+                unknown_index  # "random" or "extra" or integer
+            )
             if self.unknown_index == "extra":
                 self.unknown_index = self.re_embed
                 self.re_embed = self.re_embed + 1
@@ -465,9 +506,9 @@ class EMAVectorQuantizer(nn.Module):
         new = match.argmax(-1)
         unknown = match.sum(2) < 1
         if self.unknown_index == "random":
-            new[unknown] = torch.randint(0, self.re_embed, size=new[unknown].shape).to(
-                device=new.device
-            )
+            new[unknown] = torch.randint(
+                0, self.re_embed, size=new[unknown].shape
+            ).to(device=new.device)
         else:
             new[unknown] = self.unknown_index
         return new.reshape(ishape)
@@ -500,7 +541,9 @@ class EMAVectorQuantizer(nn.Module):
         z_q = self.embedding(encoding_indices).view(z.shape)
         encodings = F.one_hot(encoding_indices, self.num_tokens).type(z.dtype)
         avg_probs = torch.mean(encodings, dim=0)
-        perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + 1e-10)))
+        perplexity = torch.exp(
+            -torch.sum(avg_probs * torch.log(avg_probs + 1e-10))
+        )
 
         if self.training and self.embedding.update:
             # EMA cluster size

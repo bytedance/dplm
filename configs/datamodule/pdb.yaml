@@ -1,7 +1,7 @@
 _target_: pdb
 
 # data_dir: ${data_dir} # data_dir is specified in config.yaml
-  # CSV for path and metadata to training examples.
+# CSV for path and metadata to training examples.
 dataset:
   seed: 42
   cache_num_res: 0

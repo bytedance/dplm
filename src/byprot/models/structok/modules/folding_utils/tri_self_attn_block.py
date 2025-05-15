@@ -17,7 +17,13 @@ from openfold.model.triangular_multiplicative_update import (
 )
 from torch import nn
 
-from .misc import Attention, Dropout, PairToSequence, ResidueMLP, SequenceToPair
+from .misc import (
+    Attention,
+    Dropout,
+    PairToSequence,
+    ResidueMLP,
+    SequenceToPair,
+)
 
 
 class TriangularSelfAttentionBlock(nn.Module):
@@ -48,10 +54,15 @@ class TriangularSelfAttentionBlock(nn.Module):
         self.sequence_to_pair = SequenceToPair(
             sequence_state_dim, pairwise_state_dim // 2, pairwise_state_dim
         )
-        self.pair_to_sequence = PairToSequence(pairwise_state_dim, sequence_num_heads)
+        self.pair_to_sequence = PairToSequence(
+            pairwise_state_dim, sequence_num_heads
+        )
 
         self.seq_attention = Attention(
-            sequence_state_dim, sequence_num_heads, sequence_head_width, gated=True
+            sequence_state_dim,
+            sequence_num_heads,
+            sequence_head_width,
+            gated=True,
         )
         self.tri_mul_out = TriangleMultiplicationOutgoing(
             pairwise_state_dim,
@@ -74,8 +85,12 @@ class TriangularSelfAttentionBlock(nn.Module):
             inf=1e9,
         )  # type: ignore
 
-        self.mlp_seq = ResidueMLP(sequence_state_dim, 4 * sequence_state_dim, dropout=dropout)
-        self.mlp_pair = ResidueMLP(pairwise_state_dim, 4 * pairwise_state_dim, dropout=dropout)
+        self.mlp_seq = ResidueMLP(
+            sequence_state_dim, 4 * sequence_state_dim, dropout=dropout
+        )
+        self.mlp_pair = ResidueMLP(
+            pairwise_state_dim, 4 * pairwise_state_dim, dropout=dropout
+        )
 
         assert dropout < 0.4
         self.drop = nn.Dropout(dropout)
@@ -101,7 +116,14 @@ class TriangularSelfAttentionBlock(nn.Module):
         torch.nn.init.zeros_(self.mlp_pair.mlp[-2].weight)
         torch.nn.init.zeros_(self.mlp_pair.mlp[-2].bias)
 
-    def forward(self, sequence_state, pairwise_state, mask=None, chunk_size=None, **__kwargs):
+    def forward(
+        self,
+        sequence_state,
+        pairwise_state,
+        mask=None,
+        chunk_size=None,
+        **__kwargs,
+    ):
         """
         Inputs:
           sequence_state: B x L x sequence_state_dim
@@ -138,7 +160,9 @@ class TriangularSelfAttentionBlock(nn.Module):
         pairwise_state = pairwise_state + self.sequence_to_pair(sequence_state)
 
         # Axial attention with triangular bias.
-        tri_mask = mask.unsqueeze(2) * mask.unsqueeze(1) if mask is not None else None
+        tri_mask = (
+            mask.unsqueeze(2) * mask.unsqueeze(1) if mask is not None else None
+        )
         pairwise_state = pairwise_state + self.row_drop(
             self.tri_mul_out(pairwise_state, mask=tri_mask)
         )
@@ -146,10 +170,14 @@ class TriangularSelfAttentionBlock(nn.Module):
             self.tri_mul_in(pairwise_state, mask=tri_mask)
         )
         pairwise_state = pairwise_state + self.row_drop(
-            self.tri_att_start(pairwise_state, mask=tri_mask, chunk_size=chunk_size)
+            self.tri_att_start(
+                pairwise_state, mask=tri_mask, chunk_size=chunk_size
+            )
         )
         pairwise_state = pairwise_state + self.col_drop(
-            self.tri_att_end(pairwise_state, mask=tri_mask, chunk_size=chunk_size)
+            self.tri_att_end(
+                pairwise_state, mask=tri_mask, chunk_size=chunk_size
+            )
         )
 
         # MLP over pairs.

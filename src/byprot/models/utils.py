@@ -2,18 +2,20 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-from pathlib import Path
 import importlib
-from huggingface_hub import snapshot_download
+import os
 from dataclasses import dataclass, field
-from byprot.utils import load_yaml_config
-from transformers import AutoModelForMaskedLM, AutoConfig, AutoTokenizer
+from pathlib import Path
+
 import torch
 import torch.nn as nn
-import os
+from huggingface_hub import snapshot_download
+from transformers import AutoConfig, AutoModelForMaskedLM, AutoTokenizer
+
+from byprot.utils import load_yaml_config
 
 try:
-    from peft import get_peft_model, LoraConfig, TaskType
+    from peft import LoraConfig, TaskType, get_peft_model
     from peft.peft_model import PeftModel
 except:
     pass
@@ -39,6 +41,7 @@ class LoRAConfig:
 
 def get_net_class(dplm_type):
     from byprot.models import MODEL_REGISTRY
+
     net_class = MODEL_REGISTRY.get(dplm_type, None)
     if net_class is None:
         raise ValueError(f"Invalid architecture: {dplm_type}.")
@@ -48,7 +51,7 @@ def get_net_class(dplm_type):
 def get_net(cfg):
     if cfg.net.arch_type == "esm":
         from byprot.models.dplm.modules.dplm_modeling_esm import EsmForDPLM
-        
+
         config = AutoConfig.from_pretrained(f"{cfg.net.name}")
         net = EsmForDPLM(config, dropout=cfg.net.dropout)
     # TODO: dplm will support more architectures, such as Llama
@@ -109,7 +112,7 @@ def get_net_dplm2(cfg):
     # dplm2 initialize from a pretrained dplm model
     if cfg.net.arch_type == "esm":
         from byprot.models.dplm2.modules.dplm2_modeling_esm import EsmForDPLM2
-        
+
         config = AutoConfig.from_pretrained(f"{cfg.net.name}")
 
         # training_state == "train_from_dplm" means initializing from a pretrained sequence-based DPLM,
@@ -121,7 +124,10 @@ def get_net_dplm2(cfg):
         # training_state == "continue_train_from_dplm2" means continue training from a pretrained DPLM-2,
         # whose vocabulary contains amino acid and struct tokens,
         # and the vocab_size should be 33 + number of struct tokens and special tokens (e.g., 33 + 8192 + 4)
-        elif training_stage == "continue_train_from_dplm2" or not cfg.net.pretrain:
+        elif (
+            training_stage == "continue_train_from_dplm2"
+            or not cfg.net.pretrain
+        ):
             net = EsmForDPLM2(
                 config,
                 dropout=cfg.net.dropout,
@@ -140,25 +146,37 @@ def get_net_dplm2(cfg):
         if training_stage == "train_from_dplm":
             from byprot.models.dplm.dplm import DiffusionProteinLanguageModel
 
-            pretrained_state_dict = DiffusionProteinLanguageModel.from_pretrained(
-                pretrained_model_name_or_path
-            ).net.state_dict()
+            pretrained_state_dict = (
+                DiffusionProteinLanguageModel.from_pretrained(
+                    pretrained_model_name_or_path
+                ).net.state_dict()
+            )
             net.load_state_dict(pretrained_state_dict, strict=True)
 
             # expand the embedding weights
             # # initialize the new embedding with the mean and variance of pretrained embeddings.
-            net.resize_token_embeddings(getattr(cfg.tokenizer, "vocab_size", 33 + 8192 + 4))
+            net.resize_token_embeddings(
+                getattr(cfg.tokenizer, "vocab_size", 33 + 8192 + 4)
+            )
 
             pretrained_bias = net.lm_head.bias
-            net.lm_head.bias = nn.Parameter(torch.zeros(getattr(cfg.tokenizer, "vocab_size", 33 + 8192 + 4)))
+            net.lm_head.bias = nn.Parameter(
+                torch.zeros(
+                    getattr(cfg.tokenizer, "vocab_size", 33 + 8192 + 4)
+                )
+            )
             net.lm_head.bias.data[:33] = pretrained_bias.data[:33]
         elif training_stage == "continue_train_from_dplm2":
             assert is_local
-            from byprot.models.dplm2.dplm2 import MultimodalDiffusionProteinLanguageModel
+            from byprot.models.dplm2.dplm2 import (
+                MultimodalDiffusionProteinLanguageModel,
+            )
 
-            pretrained_net = MultimodalDiffusionProteinLanguageModel.from_pretrained(
-                pretrained_model_name_or_path, from_huggingface=False
-            ).net
+            pretrained_net = (
+                MultimodalDiffusionProteinLanguageModel.from_pretrained(
+                    pretrained_model_name_or_path, from_huggingface=False
+                ).net
+            )
             if issubclass(type(pretrained_net), PeftModel):
                 pretrained_net = pretrained_net.merge_and_unload()
             pretrained_state_dict = pretrained_net.state_dict()
@@ -190,37 +208,49 @@ def get_net_dplm2(cfg):
 
 def get_net_dplm2_bit(cfg):
     # dplm2 initialize from a pretrained dplm model
-    if cfg.net.arch_type == 'esm':
-        from byprot.models.dplm2.modules.dplm2_bit_modeling_esm import EsmForDPLM2Bit
-        
-        config = AutoConfig.from_pretrained(f'{cfg.net.name}')
-        net = EsmForDPLM2Bit(config, dropout=cfg.net.dropout, codebook_embed_dim=getattr(cfg.bit, "codebook_embed_dim", 13))
+    if cfg.net.arch_type == "esm":
+        from byprot.models.dplm2.modules.dplm2_bit_modeling_esm import (
+            EsmForDPLM2Bit,
+        )
+
+        config = AutoConfig.from_pretrained(f"{cfg.net.name}")
+        net = EsmForDPLM2Bit(
+            config,
+            dropout=cfg.net.dropout,
+            codebook_embed_dim=getattr(cfg.bit, "codebook_embed_dim", 13),
+        )
     # TODO: dplm2 will support more architectures, such as Llama
     else:
         raise NotImplementedError
-    
+
     if cfg.net.pretrain:
         pretrained_model_name_or_path = cfg.net.pretrained_model_name_or_path
         from byprot.models.dplm import DiffusionProteinLanguageModel
-        pretrained_state_dict = DiffusionProteinLanguageModel.from_pretrained(pretrained_model_name_or_path).net.state_dict()
-        net.load_state_dict(pretrained_state_dict, strict=False)   
-              
+
+        pretrained_state_dict = DiffusionProteinLanguageModel.from_pretrained(
+            pretrained_model_name_or_path
+        ).net.state_dict()
+        net.load_state_dict(pretrained_state_dict, strict=False)
+
         del pretrained_state_dict
-        
+
     # activate lora training if possible
     if cfg.lora.lora:
         # QKVO, MLP
-        lora_target_module = cfg.lora.lora_target_module.split(',')
-        modules_to_save = cfg.lora.modules_to_save.split(',')
+        lora_target_module = cfg.lora.lora_target_module.split(",")
+        modules_to_save = cfg.lora.modules_to_save.split(",")
 
         peft_config = LoraConfig(
-            task_type=TaskType.SEQ_2_SEQ_LM, 
+            task_type=TaskType.SEQ_2_SEQ_LM,
             target_modules=lora_target_module,
             modules_to_save=modules_to_save,
-            inference_mode=False, r=cfg.lora.lora_rank, lora_alpha=32, lora_dropout=cfg.lora.lora_dropout
+            inference_mode=False,
+            r=cfg.lora.lora_rank,
+            lora_alpha=32,
+            lora_dropout=cfg.lora.lora_dropout,
         )
         net = get_peft_model(net, peft_config)
-        
+
     return net
 
 
@@ -233,7 +263,9 @@ def topk_masking(scores, cutoff_len, stochastic=False, temp=1.0):
         mask: [b, n], with 1 if the token is in top-k lowest scores, 0 otherwise
     """
     if stochastic:
-        gumbel_noise = -torch.log(-torch.log(torch.rand_like(scores) + 1e-8) + 1e-8)
+        gumbel_noise = -torch.log(
+            -torch.log(torch.rand_like(scores) + 1e-8) + 1e-8
+        )
         _scores = scores + temp * gumbel_noise
     else:
         _scores = scores
@@ -243,7 +275,9 @@ def topk_masking(scores, cutoff_len, stochastic=False, temp=1.0):
     return masking
 
 
-def topk_masking_prior(scores, cutoff_len, stochastic=False, temp=1.0, prior_mask=None):
+def topk_masking_prior(
+    scores, cutoff_len, stochastic=False, temp=1.0, prior_mask=None
+):
     """
     scores: [b, n]
     cutoff_len: [b, 1]
@@ -252,12 +286,16 @@ def topk_masking_prior(scores, cutoff_len, stochastic=False, temp=1.0, prior_mas
         mask: [b, n], with 1 if the token is in top-k lowest scores, 0 otherwise
     """
     if stochastic:
-        gumbel_noise = -torch.log(-torch.log(torch.rand_like(scores) + 1e-8) + 1e-8)
+        gumbel_noise = -torch.log(
+            -torch.log(torch.rand_like(scores) + 1e-8) + 1e-8
+        )
         _scores = scores + temp * gumbel_noise
     else:
         _scores = scores
     sorted_index = _scores.sort(-1)[0]
-    cutoff = sorted_index.gather(dim=-1, index=cutoff_len)  # + torch.tensor(1e-10)
+    cutoff = sorted_index.gather(
+        dim=-1, index=cutoff_len
+    )  # + torch.tensor(1e-10)
     # cutoff_len = k -> select k + 1 tokens
     masking = _scores < cutoff
     return masking
@@ -294,15 +332,21 @@ def sample_from_categorical(logits=None, temperature=1.0):
     return tokens, scores
 
 
-def stochastic_sample_from_categorical(logits=None, temperature=1.0, noise_scale=1.0):
-    gumbel_noise = -torch.log(-torch.log(torch.rand_like(logits) + 1e-8) + 1e-8)
+def stochastic_sample_from_categorical(
+    logits=None, temperature=1.0, noise_scale=1.0
+):
+    gumbel_noise = -torch.log(
+        -torch.log(torch.rand_like(logits) + 1e-8) + 1e-8
+    )
     logits = logits + noise_scale * gumbel_noise
     tokens, scores = sample_from_categorical(logits, temperature)
     # scores, tokens = logits.log_softmax(dim=-1).max(dim=-1)
     return tokens, scores
 
 
-def top_k_top_p_filtering(logits, top_k=0, top_p=0.95, filter_value=-float("Inf")):
+def top_k_top_p_filtering(
+    logits, top_k=0, top_p=0.95, filter_value=-float("Inf")
+):
     """Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
     Args:
         logits: logits distribution shape (vocabulary size)
@@ -317,14 +361,20 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.95, filter_value=-float("Inf"
     top_k = min(top_k, logits.size(-1))  # Safety check
     if top_k > 0:
         # Remove all tokens with a probability less than the last token of the top-k
-        indices_to_remove = logits < torch.topk(logits, top_k, dim=1)[0][..., -1, None]
+        indices_to_remove = (
+            logits < torch.topk(logits, top_k, dim=1)[0][..., -1, None]
+        )
         logits[indices_to_remove] = filter_value
     sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-    cumulative_probs = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+    cumulative_probs = torch.cumsum(
+        torch.softmax(sorted_logits, dim=-1), dim=-1
+    )
     # Remove tokens with cumulative probability above the threshold
     sorted_indices_to_remove = cumulative_probs > top_p
     # Shift the indices to the right to keep also the first token above the threshold
-    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[
+        ..., :-1
+    ].clone()
     sorted_indices_to_remove[..., 0] = 0
     # Replace logits to be removed with -inf in the sorted_logits
     sorted_logits[sorted_indices_to_remove] = filter_value
@@ -346,11 +396,14 @@ def get_struct_tokenizer(
     cfg = load_yaml_config(f"{root_path}/config.yaml")
     stok = VQModel(**cfg)
     pretrained_state_dict = torch.load(
-        f"{root_path}/dplm2_struct_tokenizer.ckpt", map_location=torch.device("cpu")
+        f"{root_path}/dplm2_struct_tokenizer.ckpt",
+        map_location=torch.device("cpu"),
     )
-    missing, unexpected = stok.load_state_dict(pretrained_state_dict, strict=False)
+    missing, unexpected = stok.load_state_dict(
+        pretrained_state_dict, strict=False
+    )
     print(
-        f'Restored from \"{model_name_or_path}\" with {len(missing)} missing and {len(unexpected)} unexpected keys'
+        f'Restored from "{model_name_or_path}" with {len(missing)} missing and {len(unexpected)} unexpected keys'
     )
     if len(missing) > 0:
         print(f"Missing Keys: {missing}")

@@ -14,7 +14,11 @@ class CategoricalMixture:
         # All tensors are of shape ..., bins.
         self.logits = param
         bins = torch.linspace(
-            start, end, bins + 1, device=self.logits.device, dtype=self.logits.dtype
+            start,
+            end,
+            bins + 1,
+            device=self.logits.device,
+            dtype=self.logits.dtype,
         )
         self.v_bins = (bins[:-1] + bins[1:]) / 2
 
@@ -36,7 +40,9 @@ class CategoricalMixture:
             .argmin(-1)
         )
         nll = self.logits.log_softmax(-1)
-        return torch.take_along_dim(nll, true_index.unsqueeze(-1), dim=-1).squeeze(-1)
+        return torch.take_along_dim(
+            nll, true_index.unsqueeze(-1), dim=-1
+        ).squeeze(-1)
 
     def mean(self):
         return (self.logits.softmax(-1) @ self.v_bins.unsqueeze(1)).squeeze(-1)

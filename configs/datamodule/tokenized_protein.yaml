@@ -1,6 +1,6 @@
 _target_: tokenized_protein
 
-data_dir: ${paths.data_dir} 
+data_dir: ${paths.data_dir}
 # dataloader related
 max_tokens: 6000
 max_len: 1022

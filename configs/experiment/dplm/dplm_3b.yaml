@@ -18,7 +18,6 @@ name: "dplm_3b"
 datamodule:
   max_tokens: 6000
   max_len: 1022
-  
 
 model:
   _target_: dplm
@@ -51,7 +50,7 @@ task:
     type: adamw
     _partial_: true
     lr: ${train.lr}
-    betas: 
+    betas:
       - 0.9
       - 0.98
     weight_decay: 0.01 # 0.0001

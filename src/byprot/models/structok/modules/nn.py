@@ -3,7 +3,12 @@
 
 
 import torch
-from esm.modules import ContactPredictionHead, ESM1bLayerNorm, RobertaLMHead, TransformerLayer
+from esm.modules import (
+    ContactPredictionHead,
+    ESM1bLayerNorm,
+    RobertaLMHead,
+    TransformerLayer,
+)
 from torch import nn
 
 
@@ -29,7 +34,9 @@ class TransformerEncoder(nn.Module):
         )
         self.emb_layer_norm_after = ESM1bLayerNorm(self.embed_dim)
 
-    def forward(self, x, padding_mask=None, repr_layers=[], need_head_weights=False):
+    def forward(
+        self, x, padding_mask=None, repr_layers=[], need_head_weights=False
+    ):
         # x = self.embed_scale * h
 
         if padding_mask is not None:
@@ -74,7 +81,9 @@ class TransformerEncoder(nn.Module):
             attentions = torch.stack(attn_weights, 1)
             if padding_mask is not None:
                 attention_mask = 1 - padding_mask.type_as(attentions)
-                attention_mask = attention_mask.unsqueeze(1) * attention_mask.unsqueeze(2)
+                attention_mask = attention_mask.unsqueeze(
+                    1
+                ) * attention_mask.unsqueeze(2)
                 attentions = attentions * attention_mask[:, None, None, :, :]
             result["attentions"] = attentions
 

@@ -1,39 +1,47 @@
 import json
+import math
 import os
 import pickle as pkl
-from typing import Union, TypeVar, Sequence
-import torch.distributed as dist
-import numpy as np
-from transformers import EsmTokenizer
-import math
-from typing import Iterable
-from datasets import load_dataset
-import torch
+from typing import Iterable, Sequence, TypeVar, Union
 
 import numpy as np
-from torch.utils.data import BatchSampler, Dataset, Sampler, DataLoader
+import torch
+import torch.distributed as dist
+from datasets import load_dataset
+from torch.utils.data import BatchSampler, DataLoader, Dataset, Sampler
+from transformers import EsmTokenizer
+
 from byprot import utils
 
 log = utils.get_logger(__name__)
 
-T_co = TypeVar('T_co', covariant=True)
+T_co = TypeVar("T_co", covariant=True)
+
 
 class SortishSampler(Sampler):
-    """Returns indices such that inputs with similar lengths are close together."""
+    """Returns indices such that inputs with similar lengths are close
+    together."""
 
     def __init__(
-        self, sequence_lengths: Iterable, bucket_size: int, num_replicas: int = 1, rank: int = 0
+        self,
+        sequence_lengths: Iterable,
+        bucket_size: int,
+        num_replicas: int = 1,
+        rank: int = 0,
     ):
         if dist.is_available():
             num_replicas = dist.get_world_size()
             rank = dist.get_rank()
         self.data = np.argsort(sequence_lengths)
         self.num_replicas = num_replicas
-        self.num_samples = int(math.ceil(len(self.data) * 1.0 / self.num_replicas))
+        self.num_samples = int(
+            math.ceil(len(self.data) * 1.0 / self.num_replicas)
+        )
         self.bucket_size = bucket_size
         n_buckets = int(np.ceil(len(self.data) / self.bucket_size))
         self.data = [
-            self.data[i * bucket_size : i * bucket_size + bucket_size] for i in range(n_buckets)
+            self.data[i * bucket_size : i * bucket_size + bucket_size]
+            for i in range(n_buckets)
         ]
         self.rank = rank
         self.epoch = 0
@@ -59,6 +67,7 @@ class SortishSampler(Sampler):
 
     def set_epoch(self, epoch):
         self.epoch = epoch
+
 
 class ApproxBatchSampler(BatchSampler):
     """
@@ -86,7 +95,7 @@ class ApproxBatchSampler(BatchSampler):
         max_square_tokens=np.inf,
         drop_last=False,
         batch_size=None,
-        max_len=512
+        max_len=512,
     ):
         super().__init__(sampler, max_batch, drop_last)
         self.longest_token = 0
@@ -97,7 +106,7 @@ class ApproxBatchSampler(BatchSampler):
         self.max_square_tokens = max_square_tokens
         self.max_len = max_len
         self.batches = self._build_batches()
-        
+
     def _build_batches(self):
         batches = []
         length = 0
@@ -107,7 +116,10 @@ class ApproxBatchSampler(BatchSampler):
             this_length = min(self.max_len, self.sample_lengths[idx])
             linear = (len(batch) + 1) * max(length, this_length)
             quadratic = (len(batch) + 1) * max(ell_sq, this_length**2)
-            if linear <= self.max_tokens and quadratic < self.max_square_tokens:
+            if (
+                linear <= self.max_tokens
+                and quadratic < self.max_square_tokens
+            ):
                 batch.append(idx)
                 length = max(length, this_length)
                 ell_sq = max(ell_sq, this_length**2)
@@ -117,7 +129,7 @@ class ApproxBatchSampler(BatchSampler):
                     length = 0
             else:
                 if len(batch) == 0:
-                    print('Current batch is empty! idx is ', idx)
+                    print("Current batch is empty! idx is ", idx)
                     continue
                 batches.append(batch)
                 batch = [idx]
@@ -125,12 +137,16 @@ class ApproxBatchSampler(BatchSampler):
                 ell_sq = this_length**2
         if len(batch) > 0:
             batches.append(batch)
-            
+
         if self.sampler.num_replicas > 1:
             num_samples = torch.tensor(len(batches)).cuda()
-            print(f'==============Local Rank {self.sampler.rank} Num Samples {num_samples}==============')
+            print(
+                f"==============Local Rank {self.sampler.rank} Num Samples {num_samples}=============="
+            )
             dist.all_reduce(num_samples, op=dist.ReduceOp.MAX)
-            print(f'==============All Reduce Num Samples {num_samples}==============')
+            print(
+                f"==============All Reduce Num Samples {num_samples}=============="
+            )
             num_samples = num_samples.item()
 
             if len(batches) < num_samples:
@@ -141,9 +157,11 @@ class ApproxBatchSampler(BatchSampler):
                 new_batches += batches[:b]
                 assert len(new_batches) == num_samples
                 batches = new_batches
-            print(f'==============After Reduce, Rank{self.sampler.rank}, Num Samples {num_samples}==============')
+            print(
+                f"==============After Reduce, Rank{self.sampler.rank}, Num Samples {num_samples}=============="
+            )
         return batches
-            
+
     def __len__(self):
         return len(self.batches)
 
@@ -151,9 +169,9 @@ class ApproxBatchSampler(BatchSampler):
         for batch in self.batches:
             yield batch
 
+
 class UniRefHFDataset(Dataset):
-    """
-    Dataset that pulls from UniRef/Uniclust downloads.
+    """Dataset that pulls from UniRef/Uniclust downloads.
 
     The data folder should contain the following:
     - 'consensus.fasta': consensus sequences, no line breaks in sequences
@@ -177,11 +195,11 @@ class UniRefHFDataset(Dataset):
         return len(self.indices)
 
     def get_metadata_lens(self):
-        return self.indices['length']
+        return self.indices["length"]
 
     def __getitem__(self, idx):
-        seq = self.indices[int(idx)]['seq']
-        
+        seq = self.indices[int(idx)]["seq"]
+
         if len(seq) - self.max_len > 0:
             start = np.random.choice(len(seq) - self.max_len)
             stop = start + self.max_len
@@ -190,6 +208,7 @@ class UniRefHFDataset(Dataset):
             stop = len(seq)
         seq = seq[start:stop]
         return seq
+
 
 class UniRefDatasetForTesting(Dataset):
     def __init__(
@@ -201,7 +220,7 @@ class UniRefDatasetForTesting(Dataset):
         self.indices = []
         self.metadata_lens = []
         for i in range(1, 11):
-            self.indices += ['A' * 100 * i] * num_seqs
+            self.indices += ["A" * 100 * i] * num_seqs
             self.metadata_lens += [100 * i] * num_seqs
         # self.indices += ['A' * 500] * num_seqs
         # self.metadata_lens += [500] * num_seqs
@@ -213,10 +232,11 @@ class UniRefDatasetForTesting(Dataset):
 
     def get_metadata_lens(self):
         return self.metadata_lens
-    
+
     def __getitem__(self, idx):
         seq = self.indices[idx]
         return seq
+
 
 class Subset(Dataset[T_co]):
     r"""
@@ -241,14 +261,19 @@ class Subset(Dataset[T_co]):
     def __len__(self):
         return len(self.indices)
 
+
 class DPLMCollater(object):
-    "Wrapped for OA Collater to operate on ESM w/ ESM alphabet and batch converter/tokens"
+    """Wrapped for OA Collater to operate on ESM w/ ESM alphabet and batch
+    converter/tokens."""
+
     def __init__(self, tokenizer_path=None):
-        # by default we use the EsmTokenizer and the esm vocab. 
-        # if you want to use the different vocab, 
+        # by default we use the EsmTokenizer and the esm vocab.
+        # if you want to use the different vocab,
         # please set the vocab path to the tokenizer_path
         if tokenizer_path is None:
-            self.alphabet = EsmTokenizer.from_pretrained('facebook/esm2_t30_150M_UR50D')
+            self.alphabet = EsmTokenizer.from_pretrained(
+                "facebook/esm2_t30_150M_UR50D"
+            )
         else:
             self.alphabet = EsmTokenizer.from_pretrained(tokenizer_path)
 
@@ -257,33 +282,48 @@ class DPLMCollater(object):
             print("list idx error!")
             print(sequences)
         input_data = sequences
-        batch = self.alphabet.batch_encode_plus(input_data,
-                                                add_special_tokens=True,
-                                                padding="longest",
-                                                return_tensors='pt')
+        batch = self.alphabet.batch_encode_plus(
+            input_data,
+            add_special_tokens=True,
+            padding="longest",
+            return_tensors="pt",
+        )
 
         batch = {
-                'input_ids':  batch['input_ids'],
-                'input_mask': batch['attention_mask'].bool(),
-                'targets':    batch['input_ids'].clone()
-            }
+            "input_ids": batch["input_ids"],
+            "input_mask": batch["attention_mask"].bool(),
+            "targets": batch["input_ids"].clone(),
+        }
         return batch
 
 
 def setup_dataloader(
-        ds: UniRefHFDataset,  
-        max_tokens=6000, bucket_size=1000, 
-        max_batch_size=800,  num_workers=8,
-        rank=0, world_size=1,
-        max_len=512,
-    ) -> DataLoader:
+    ds: UniRefHFDataset,
+    max_tokens=6000,
+    bucket_size=1000,
+    max_batch_size=800,
+    num_workers=8,
+    rank=0,
+    world_size=1,
+    max_len=512,
+) -> DataLoader:
     collater = DPLMCollater()
     lens = ds.get_metadata_lens()
-    train_sortish_sampler = SortishSampler(lens, bucket_size, num_replicas=world_size, rank=rank)
-    train_sampler = ApproxBatchSampler(train_sortish_sampler, max_tokens, max_batch_size, lens,
-                                        max_len=max_len)
+    train_sortish_sampler = SortishSampler(
+        lens, bucket_size, num_replicas=world_size, rank=rank
+    )
+    train_sampler = ApproxBatchSampler(
+        train_sortish_sampler,
+        max_tokens,
+        max_batch_size,
+        lens,
+        max_len=max_len,
+    )
     dl = DataLoader(
-        dataset=ds, batch_sampler=train_sampler, num_workers=num_workers, collate_fn=collater
+        dataset=ds,
+        batch_sampler=train_sampler,
+        num_workers=num_workers,
+        collate_fn=collater,
     )
     return dl
 
@@ -291,5 +331,3 @@ def setup_dataloader(
 def load_dataset_from_hf(data_path, split):
     ds = load_dataset(data_path, split=split)
     return ds
-    
-    

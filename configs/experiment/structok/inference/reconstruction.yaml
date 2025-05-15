@@ -1,6 +1,5 @@
 # This config is highly inspired by the MultiFlow (https://github.com/jasonkyuyim/multiflow) repo.
 
-
 env:
   PROJECT_ROOT: /root/research/projects/ByProt
 
@@ -23,7 +22,7 @@ inference:
   no_self_consistency: true
 
   input_pdb_folder: /root/research/projects/ByProt/data/cameo2022/pdb3
-  # Directory of software, weights, and outputs.  
+  # Directory of software, weights, and outputs.
   pmpnn_dir: vendor/ProteinMPNN
 
   folding:

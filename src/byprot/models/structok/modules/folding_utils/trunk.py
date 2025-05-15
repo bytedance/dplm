@@ -61,9 +61,8 @@ class FoldingTrunkConfig:
 
 
 def get_axial_mask(mask):
-    """
-    Helper to convert B x L mask of valid positions to axial mask used
-    in row column attentions.
+    """Helper to convert B x L mask of valid positions to axial mask used in
+    row column attentions.
 
     Input:
       mask: B x L tensor of booleans
@@ -132,7 +131,9 @@ class FoldingTrunk(nn.Module):
         assert c_z % self.cfg.pairwise_head_width == 0
         block = TriangularSelfAttentionBlock
 
-        self.pairwise_positional_embedding = RelativePosition(self.cfg.position_bins, c_z)
+        self.pairwise_positional_embedding = RelativePosition(
+            self.cfg.position_bins, c_z
+        )
 
         from fairscale.nn.checkpoint import checkpoint_wrapper
 
@@ -185,7 +186,14 @@ class FoldingTrunk(nn.Module):
         self.chunk_size = chunk_size
 
     def forward(
-        self, seq_feats, pair_feats, true_aa, residx, mask, no_recycles: T.Optional[int] = None, return_features_only=False
+        self,
+        seq_feats,
+        pair_feats,
+        true_aa,
+        residx,
+        mask,
+        no_recycles: T.Optional[int] = None,
+        return_features_only=False,
     ):
         """
         Inputs:
@@ -206,9 +214,7 @@ class FoldingTrunk(nn.Module):
             no_recycles = self.cfg.max_recycles
         else:
             assert no_recycles >= 0, "Number of recycles must not be negative."
-            no_recycles += (
-                1  # First 'recycle' is just the standard forward pass through the model.
-            )
+            no_recycles += 1  # First 'recycle' is just the standard forward pass through the model.
 
         if self.training:
             no_recycles = random.randint(1, no_recycles)
@@ -229,7 +235,11 @@ class FoldingTrunk(nn.Module):
                     )
                 else:
                     s, z = block(
-                        s, z, mask=mask, residue_index=residx, chunk_size=self.chunk_size
+                        s,
+                        z,
+                        mask=mask,
+                        residue_index=residx,
+                        chunk_size=self.chunk_size,
                     )
             return s, z
 
@@ -237,7 +247,9 @@ class FoldingTrunk(nn.Module):
         s_z = s_z_0
         recycle_s = torch.zeros_like(s_s)
         recycle_z = torch.zeros_like(s_z)
-        recycle_bins = torch.zeros(*s_z.shape[:-1], device=device, dtype=torch.int64)
+        recycle_bins = torch.zeros(
+            *s_z.shape[:-1], device=device, dtype=torch.int64
+        )
 
         structure = {}
         assert no_recycles > 0
@@ -248,13 +260,18 @@ class FoldingTrunk(nn.Module):
                 recycle_z = self.recycle_z_norm(recycle_z.detach())
                 recycle_z += self.recycle_disto(recycle_bins.detach())
 
-                s_s, s_z = trunk_iter(s_s_0 + recycle_s, s_z_0 + recycle_z, residx, mask)
+                s_s, s_z = trunk_iter(
+                    s_s_0 + recycle_s, s_z_0 + recycle_z, residx, mask
+                )
 
                 if return_features_only:
                     break
                 # === Structure module ===
                 structure = self.structure_module(
-                    {"single": self.trunk2sm_s(s_s), "pair": self.trunk2sm_z(s_z)},
+                    {
+                        "single": self.trunk2sm_s(s_s),
+                        "pair": self.trunk2sm_z(s_z),
+                    },
                     true_aa,
                     mask.float(),
                 )
@@ -291,6 +308,10 @@ class FoldingTrunk(nn.Module):
         c = C - CA
         a = b.cross(c, dim=-1)
         CB = -0.58273431 * a + 0.56802827 * b - 0.54067466 * c + CA
-        dists = (CB[..., None, :, :] - CB[..., :, None, :]).pow(2).sum(dim=-1, keepdims=True)
+        dists = (
+            (CB[..., None, :, :] - CB[..., :, None, :])
+            .pow(2)
+            .sum(dim=-1, keepdims=True)
+        )
         bins = torch.sum(dists > boundaries, dim=-1)  # [..., L, L]
         return bins

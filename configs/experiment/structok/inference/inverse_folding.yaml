@@ -1,6 +1,5 @@
 # This config is highly inspired by the MultiFlow (https://github.com/jasonkyuyim/multiflow) repo.
 
-
 env:
   PROJECT_ROOT: /root/research/projects/ByProt
 
@@ -24,7 +23,7 @@ inference:
   # input_fasta_dir: /root/research/projects/ByProt/.local/DPLM_Structok_150m/inverse_folding/step50000_lr2e-4_dp0.1_bsz32_clip0.5_ptrntrue_ourvocab_lddt_mm_cluster50_split_step10499_IF_cluster
   input_fasta_dir: /path/to/input/fasta/folder
 
-  # Directory of software, weights, and outputs.  
+  # Directory of software, weights, and outputs.
   pmpnn_dir: vendor/ProteinMPNN
 
   folding:

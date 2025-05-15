@@ -63,7 +63,11 @@ class ESMFoldStructureDecoder(nn.Module):
     def __init__(self, esmfold_config=None, **kwargs):
         super().__init__()
 
-        self.cfg = esmfold_config if esmfold_config else merge_config(ESMFoldConfig(), kwargs)
+        self.cfg = (
+            esmfold_config
+            if esmfold_config
+            else merge_config(ESMFoldConfig(), kwargs)
+        )
         self.cfg = OmegaConf.create(self.cfg)
         OmegaConf.set_struct(self.cfg, False)
         cfg = self.cfg
@@ -133,10 +137,14 @@ class ESMFoldStructureDecoder(nn.Module):
         aa = (aa + 1).masked_fill(mask != 1, 0)
         return self.af2_to_esm[aa]
 
-    def _esm_idx_to_af2_idx(self, esmaa, mask): ...
+    def _esm_idx_to_af2_idx(self, esmaa, mask):
+        ...
 
-    def _compute_language_model_representations(self, esmaa: torch.Tensor) -> torch.Tensor:
-        """Adds bos/eos tokens for the language model, since the structure module doesn't use these."""
+    def _compute_language_model_representations(
+        self, esmaa: torch.Tensor
+    ) -> torch.Tensor:
+        """Adds bos/eos tokens for the language model, since the structure
+        module doesn't use these."""
         batch_size = esmaa.size(0)
 
         bosi, eosi = self.esm_dict.cls_idx, self.esm_dict.eos_idx
@@ -151,10 +159,14 @@ class ESMFoldStructureDecoder(nn.Module):
             repr_layers=range(self.esm.num_layers + 1),
             need_head_weights=self.cfg.use_esm_attn_map,
         )
-        esm_s = torch.stack([v for _, v in sorted(res["representations"].items())], dim=2)
+        esm_s = torch.stack(
+            [v for _, v in sorted(res["representations"].items())], dim=2
+        )
         esm_s = esm_s[:, 1:-1]  # B, L, nLayers, C
         esm_z = (
-            res["attentions"].permute(0, 4, 3, 1, 2).flatten(3, 4)[:, 1:-1, 1:-1, :]
+            res["attentions"]
+            .permute(0, 4, 3, 1, 2)
+            .flatten(3, 4)[:, 1:-1, 1:-1, :]
             if self.cfg.use_esm_attn_map
             else None
         )
@@ -179,10 +191,10 @@ class ESMFoldStructureDecoder(nn.Module):
         residx: T.Optional[torch.Tensor] = None,
         masking_pattern: T.Optional[torch.Tensor] = None,
         num_recycles: T.Optional[int] = None,
-        return_features_only=False
+        return_features_only=False,
     ):
-        """Runs a forward pass given input tokens. Use `model.infer` to
-        run inference from a sequence.
+        """Runs a forward pass given input tokens. Use `model.infer` to run
+        inference from a sequence.
 
         Args:
             aa (torch.Tensor): Tensor containing indices corresponding to amino acids. Indices match
@@ -237,7 +249,13 @@ class ESMFoldStructureDecoder(nn.Module):
         # === forward trunk ===
         pseudo_aa = torch.zeros_like(aa)
         structure: dict = self.trunk(
-            s_s_0, s_z_0, pseudo_aa, residx, mask, no_recycles=num_recycles, return_features_only=return_features_only
+            s_s_0,
+            s_z_0,
+            pseudo_aa,
+            residx,
+            mask,
+            no_recycles=num_recycles,
+            return_features_only=return_features_only,
         )
         # Documenting what we expect:
         structure = {
@@ -343,7 +361,13 @@ class ESMFoldStructureDecoder(nn.Module):
         if isinstance(sequences, str):
             sequences = [sequences]
 
-        aatype, mask, _residx, linker_mask, chain_index = batch_encode_sequences(
+        (
+            aatype,
+            mask,
+            _residx,
+            linker_mask,
+            chain_index,
+        ) = batch_encode_sequences(
             sequences, residue_index_offset, chain_linker
         )
 
@@ -364,26 +388,31 @@ class ESMFoldStructureDecoder(nn.Module):
             num_recycles=num_recycles,
         )
 
-        output["atom37_atom_exists"] = output["atom37_atom_exists"] * linker_mask.unsqueeze(2)
+        output["atom37_atom_exists"] = output[
+            "atom37_atom_exists"
+        ] * linker_mask.unsqueeze(2)
 
-        output["mean_plddt"] = (output["plddt"] * output["atom37_atom_exists"]).sum(
-            dim=(1, 2)
-        ) / output["atom37_atom_exists"].sum(dim=(1, 2))
+        output["mean_plddt"] = (
+            output["plddt"] * output["atom37_atom_exists"]
+        ).sum(dim=(1, 2)) / output["atom37_atom_exists"].sum(dim=(1, 2))
         output["chain_index"] = chain_index
 
         return output
 
     def output_to_pdb(self, output: T.Dict) -> T.List[str]:
-        """Returns the pbd (file) string from the model given the model output."""
+        """Returns the pbd (file) string from the model given the model
+        output."""
         return output_to_pdb(output)
 
     def infer_pdbs(self, seqs: T.List[str], *args, **kwargs) -> T.List[str]:
-        """Returns list of pdb (files) strings from the model given a list of input sequences."""
+        """Returns list of pdb (files) strings from the model given a list of
+        input sequences."""
         output = self.infer(seqs, *args, **kwargs)
         return self.output_to_pdb(output)
 
     def infer_pdb(self, sequence: str, *args, **kwargs) -> str:
-        """Returns the pdb (file) string from the model given an input sequence."""
+        """Returns the pdb (file) string from the model given an input
+        sequence."""
         return self.infer_pdbs([sequence], *args, **kwargs)[0]
 
     def set_chunk_size(self, chunk_size: T.Optional[int]):

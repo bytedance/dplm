@@ -2,16 +2,20 @@ import argparse
 import os
 
 import torch
+import tree
 from Bio import SeqIO
 from peft.peft_model import PeftModel
 from tqdm import tqdm
-import tree
 
-from byprot.models.dplm2 import MultimodalDiffusionProteinLanguageModel as DPLM2
 from byprot.models.dplm2 import DPLM2Bit
+from byprot.models.dplm2 import (
+    MultimodalDiffusionProteinLanguageModel as DPLM2,
+)
 
 
-def initialize_conditional_generation(fasta_path, tokenizer, device, args, model=None):
+def initialize_conditional_generation(
+    fasta_path, tokenizer, device, args, model=None
+):
     input_data_aatype = []
     input_data_struct_tokens = []
     input_data_name = []
@@ -129,7 +133,9 @@ def initialize_conditional_generation(fasta_path, tokenizer, device, args, model
     return batches, input_data_name_list
 
 
-def initialize_generation(task, num_seqs, length, tokenizer, device, batch_size=50):
+def initialize_generation(
+    task, num_seqs, length, tokenizer, device, batch_size=50
+):
     def create_init_seq(length):
         if task == "sequence_generation":
             seq = tokenizer.aa_mask_token * length
@@ -148,7 +154,7 @@ def initialize_generation(task, num_seqs, length, tokenizer, device, batch_size=
             raise NotImplementedError
 
         return seq
-    
+
     init_struct_list = []
     init_aa_list = []
     for _ in range(num_seqs):
@@ -157,8 +163,8 @@ def initialize_generation(task, num_seqs, length, tokenizer, device, batch_size=
             seq_struct, seq_aa = seq
             seq = seq_struct + seq_aa
         init_struct_list.append(seq_struct)
-        init_aa_list.append(seq_aa)            
-    
+        init_aa_list.append(seq_aa)
+
     input_tokens_batch = []
     start = 0
     end = start + batch_size
@@ -195,7 +201,7 @@ def unconditional_generate(args):
         model = DPLM2Bit.from_pretrained(args.model_name)
     else:
         model = DPLM2.from_pretrained(args.model_name)
-        
+
     tokenizer = model.tokenizer
     model = model.eval()
     model = model.cuda()
@@ -206,12 +212,12 @@ def unconditional_generate(args):
     for seq_len in args.seq_lens:
         max_iter = args.max_iter
         input_tokens_batch = initialize_generation(
-            task=args.task, 
-            num_seqs=args.num_seqs, 
-            length=seq_len, 
+            task=args.task,
+            num_seqs=args.num_seqs,
+            length=seq_len,
             tokenizer=tokenizer,
             device=device,
-            batch_size=args.batch_size
+            batch_size=args.batch_size,
         )
         with torch.cuda.amp.autocast(dtype=torch.bfloat16):
             all_outputs = {}
@@ -229,13 +235,17 @@ def unconditional_generate(args):
                     sampling_strategy=args.sampling_strategy,
                 )
                 if args.task == "backbone_generation":
-                    _struct_tokens = outputs['output_tokens'].chunk(2, dim=1)[0]
-                    outputs['output_tokens'] = torch.cat(
+                    _struct_tokens = outputs["output_tokens"].chunk(2, dim=1)[
+                        0
+                    ]
+                    outputs["output_tokens"] = torch.cat(
                         [_struct_tokens, _aatype_tokens], dim=1
                     )
                 for k, v in outputs.items():
                     if k in all_outputs:
-                        all_outputs[k] = torch.concat([all_outputs[k], v], dim=0)
+                        all_outputs[k] = torch.concat(
+                            [all_outputs[k], v], dim=0
+                        )
                     else:
                         all_outputs[k] = v
 
@@ -245,7 +255,7 @@ def unconditional_generate(args):
                 [
                     ",".join(seq.split(" "))
                     for seq in tokenizer.batch_decode(
-                        all_outputs['output_tokens'], skip_special_tokens=False
+                        all_outputs["output_tokens"], skip_special_tokens=False
                     )
                 ]
             )
@@ -254,7 +264,7 @@ def unconditional_generate(args):
                 [
                     "".join(seq.split(" "))
                     for seq in tokenizer.batch_decode(
-                        all_outputs['output_tokens'], skip_special_tokens=False
+                        all_outputs["output_tokens"], skip_special_tokens=False
                     )
                 ]
             )
@@ -263,7 +273,7 @@ def unconditional_generate(args):
                 [
                     ",".join(seq.split(" "))
                     for seq in tokenizer.batch_decode(
-                        all_outputs['output_tokens'], skip_special_tokens=False
+                        all_outputs["output_tokens"], skip_special_tokens=False
                     )
                 ]
             )
@@ -286,7 +296,7 @@ def conditional_generate_from_fasta(args):
         model = DPLM2Bit.from_pretrained(args.model_name)
     else:
         model = DPLM2.from_pretrained(args.model_name)
-        
+
     tokenizer = model.tokenizer
     model = model.eval()
     model = model.cuda()
@@ -321,8 +331,16 @@ def conditional_generate_from_fasta(args):
         )
 
 
-def save_fasta(save_name, output_results, struct_tokens=False, headers=None, continue_write=False):
-    fp_save = open(save_name, "w") if not continue_write else open(save_name, "a")
+def save_fasta(
+    save_name,
+    output_results,
+    struct_tokens=False,
+    headers=None,
+    continue_write=False,
+):
+    fp_save = (
+        open(save_name, "w") if not continue_write else open(save_name, "a")
+    )
     for idx, seq in enumerate(output_results):
         if headers is not None:
             fp_save.write(f">{headers[idx]}\n")
@@ -350,10 +368,10 @@ def save_results(
     os.makedirs(save_dir, exist_ok=True)
     print(f"Saving results to {save_dir}...")
     if headers is None:
-        headers = [f"sample_{i}" for i in range(len(outputs['output_tokens']))]
+        headers = [f"sample_{i}" for i in range(len(outputs["output_tokens"]))]
 
     if task in ["sequence_generation"]:
-        aatype_tokens = outputs['output_tokens']
+        aatype_tokens = outputs["output_tokens"]
         aatype_fasta_path = os.path.join(save_dir, "aatype.fasta")
         aatype_strings = list(
             map(
@@ -376,7 +394,7 @@ def save_results(
         "folding",
         "inverse_folding",
     ]:
-        output_tokens = outputs['output_tokens']
+        output_tokens = outputs["output_tokens"]
         struct_tokens, aatype_tokens = output_tokens.chunk(2, dim=-1)
         struct_token_fasta_path = os.path.join(save_dir, "struct_token.fasta")
         aatype_fasta_path = os.path.join(save_dir, "aatype.fasta")
@@ -414,19 +432,24 @@ def save_results(
             for idx, (header, aatype_str, struct_tokens_str) in enumerate(
                 zip(headers, aatype_strings, struct_tokens_strings)
             ):
-                aatype_tensor, struct_tokens_tensor = (
-                    struct_tokenizer.string_to_tensor(
-                        aatype_str, struct_tokens_str
-                    )
+                (
+                    aatype_tensor,
+                    struct_tokens_tensor,
+                ) = struct_tokenizer.string_to_tensor(
+                    aatype_str, struct_tokens_str
                 )
                 if "final_struct_feature" in outputs:
                     decoder_out = struct_tokenizer.detokenize(
-                        struct_tokens=outputs['final_struct_feature'][idx][None],
-                        res_mask=outputs['res_mask'][idx][None]
+                        struct_tokens=outputs["final_struct_feature"][idx][
+                            None
+                        ],
+                        res_mask=outputs["res_mask"][idx][None],
                     )
                 else:
-                    decoder_out = struct_tokenizer.detokenize(struct_tokens_tensor)
-                    
+                    decoder_out = struct_tokenizer.detokenize(
+                        struct_tokens_tensor
+                    )
+
                 decoder_out["aatype"] = aatype_tensor
                 decoder_out["header"] = [header]
 
@@ -450,8 +473,12 @@ def main():
     parser.add_argument("--seq_lens", nargs="*", type=int)
     parser.add_argument("--saveto", type=str, default="gen.fasta")
     parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--sampling_strategy", type=str, default="annealing@2.2:0.1")
-    parser.add_argument("--unmasking_strategy", type=str, default="stochastic1.0")
+    parser.add_argument(
+        "--sampling_strategy", type=str, default="annealing@2.2:0.1"
+    )
+    parser.add_argument(
+        "--unmasking_strategy", type=str, default="stochastic1.0"
+    )
     parser.add_argument("--max_iter", type=int, default=500)
     parser.add_argument("--batch_size", type=int, default=50)
     parser.add_argument("--save_pdb", type=bool, default=True)

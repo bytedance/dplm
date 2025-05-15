@@ -12,7 +12,10 @@ import torch.nn as nn
 from einops import reduce
 
 from byprot.datamodules.dataset.tokenized_protein import DPLM2Tokenizer
-from byprot.models.dplm2.dplm2 import DPLM2Config, MultimodalDiffusionProteinLanguageModel as DPLM2
+from byprot.models.dplm2.dplm2 import DPLM2Config
+from byprot.models.dplm2.dplm2 import (
+    MultimodalDiffusionProteinLanguageModel as DPLM2,
+)
 from byprot.models.dplm2.modules.dplm2_modeling_esm import *
 from byprot.models.utils import *
 
@@ -38,12 +41,16 @@ class DPLM2Bit(DPLM2):
     def __init__(self, cfg, net=None):
         nn.Module.__init__(self)
         self._update_cfg(cfg)
-        self.tokenizer = DPLM2Tokenizer.from_pretrained(self.cfg.tokenizer.vocab_file)
+        self.tokenizer = DPLM2Tokenizer.from_pretrained(
+            self.cfg.tokenizer.vocab_file
+        )
         self._struct_tokenizer = None
         # binary classification for each dimension of quant feature
-        self.cfg.bit.codebook_embed_dim = self.struct_tokenizer.codebook_embed_dim
+        self.cfg.bit.codebook_embed_dim = (
+            self.struct_tokenizer.codebook_embed_dim
+        )
         if net is None:
-            self.net = get_net_dplm2_bit(self.cfg) 
+            self.net = get_net_dplm2_bit(self.cfg)
         else:
             if "bit" not in net.config.dplm_type:
                 raise ValueError(
@@ -55,7 +62,7 @@ class DPLM2Bit(DPLM2):
         if self.cfg.gradient_ckpt:
             self.net.supports_gradient_checkpointing = True
             self.net.gradient_checkpointing_enable()
-        
+
         if self.cfg.bit.load_from_pretrained:
             pretrained_state_dict = torch.load(
                 self.cfg.bit.load_path, map_location=torch.device("cpu")
@@ -69,14 +76,14 @@ class DPLM2Bit(DPLM2):
             print(
                 f"Successfully load pretrained dplm2 bit model from {self.cfg.bit.load_path}!"
             )
-        
+
     def _prepare_special_token(self):
         super()._prepare_special_token()
         # HACK: struct tokens and amino acid tokens are in the same vocabulary,
         # there are 33 amino acid tokens, 3 special struct tokens (bos, eos, unk)
         # so the first index of normal struct token is 36
         self.struct_vocab_offset = 36
-    
+
     def forward(self, input_ids, **kwargs):
         input_mask = input_ids.ne(self.pad_id)
 
@@ -85,17 +92,23 @@ class DPLM2Bit(DPLM2):
         L = input_ids.shape[1]
         num_heads = self.net.config.num_attention_heads
         # [B, num_heads, L+2, L+2]
-        attention_bias: torch.FloatType = self.net.esm.get_extended_attention_mask(
-            input_mask, input_ids.shape
-        ).repeat(
-            1, num_heads, L, 1
+        attention_bias: torch.FloatType = (
+            self.net.esm.get_extended_attention_mask(
+                input_mask, input_ids.shape
+            ).repeat(1, num_heads, L, 1)
         )  # -inf for padding positions, 0 otherwise
 
         if "single_modality" in kwargs:
             single_modality_index = kwargs["single_modality"]
-            struct_attention_bias, aa_attention_bias = attention_bias.chunk(2, dim=-2)
-            struct_attention_bias[single_modality_index, :, :, L // 2 :] = -math.inf
-            aa_attention_bias[single_modality_index, :, :, : L // 2] = -math.inf
+            struct_attention_bias, aa_attention_bias = attention_bias.chunk(
+                2, dim=-2
+            )
+            struct_attention_bias[
+                single_modality_index, :, :, L // 2 :
+            ] = -math.inf
+            aa_attention_bias[
+                single_modality_index, :, :, : L // 2
+            ] = -math.inf
             attention_bias = torch.concat(
                 [struct_attention_bias, aa_attention_bias], dim=-2
             )
@@ -111,7 +124,7 @@ class DPLM2Bit(DPLM2):
         quant = self.struct_tokenizer.quantize.get_codebook_entry(
             input_struct_ids - self.struct_vocab_offset
         )
-        
+
         input_struct_embeds = self.net.quant2emb(quant).float()
         input_struct_embeds[:, 0] = self.net.struct_bos_emb
         eos_position = input_struct_ids == self.struct_eos_id
@@ -119,7 +132,9 @@ class DPLM2Bit(DPLM2):
         mask_position = input_struct_ids == self.struct_mask_id
         input_struct_embeds[mask_position] = self.net.struct_mask_emb
 
-        input_embeds = torch.concat([input_struct_embeds, input_aatype_embeds], dim=1)
+        input_embeds = torch.concat(
+            [input_struct_embeds, input_aatype_embeds], dim=1
+        )
 
         outputs = self.net(
             input_ids=input_ids,
@@ -170,7 +185,9 @@ class DPLM2Bit(DPLM2):
 
         bool_index_list = []
         for int_index in int_index_list:
-            bool_index = torch.zeros(bsz, dtype=torch.bool).to(struct_target.device)
+            bool_index = torch.zeros(bsz, dtype=torch.bool).to(
+                struct_target.device
+            )
             bool_index[int_index] = True
             bool_index_list.append(bool_index)
 
@@ -190,7 +207,9 @@ class DPLM2Bit(DPLM2):
                 struct_t,
                 struct_type_id,
                 maskable_mask=self.get_non_special_symbol_mask(struct_target),
-                plddt_mask=batch["plddt_mask"] if "plddt_mask" in batch else None,
+                plddt_mask=batch["plddt_mask"]
+                if "plddt_mask" in batch
+                else None,
             ).values()
         )
         aatype_t = aatype_t.masked_fill(folding_index, 0)
@@ -202,7 +221,9 @@ class DPLM2Bit(DPLM2):
                 aatype_t,
                 aa_type_id,
                 maskable_mask=self.get_non_special_symbol_mask(aatype_target),
-                plddt_mask=batch["plddt_mask"] if "plddt_mask" in batch else None,
+                plddt_mask=batch["plddt_mask"]
+                if "plddt_mask" in batch
+                else None,
             ).values()
         )
 
@@ -214,15 +235,15 @@ class DPLM2Bit(DPLM2):
 
     def compute_loss(self, batch, weighting="linear"):
         struct_target = batch["struct_tokens"]["targets"]
-        aatype_target = (
-            batch["aatype_tokens"]["targets"]
-        )
+        aatype_target = batch["aatype_tokens"]["targets"]
 
         bsz, seq_len = struct_target.shape
 
-        struct_noised, aatype_noised, single_modality_index = self.construct_x_t(
-            batch, struct_target, aatype_target
-        )
+        (
+            struct_noised,
+            aatype_noised,
+            single_modality_index,
+        ) = self.construct_x_t(batch, struct_target, aatype_target)
         x_t = torch.concat([struct_noised["x_t"], aatype_noised["x_t"]], dim=1)
         if self.cfg.self_mixup.enable:
             # 1. first part: masked prediction
@@ -233,7 +254,9 @@ class DPLM2Bit(DPLM2):
                 lm_logits = model_outputs["logits"]
             # 2. mixup: alternate mask with model prediction and gt with masks
             prev_input_ids = x_t
-            non_special_sym_mask = self.get_non_special_symbol_mask(prev_input_ids)
+            non_special_sym_mask = self.get_non_special_symbol_mask(
+                prev_input_ids
+            )
             model_pred = torch.where(
                 non_special_sym_mask, lm_logits.argmax(dim=-1), prev_input_ids
             )
@@ -245,19 +268,21 @@ class DPLM2Bit(DPLM2):
 
             # # 3. second part: denoising + masked prediction
             model_outputs = self.forward(
-                input_ids=mixup_input_ids, single_modality=single_modality_index
+                input_ids=mixup_input_ids,
+                single_modality=single_modality_index,
             )
             aatype_logits = model_outputs["aatype_logits"]
-            struct_logits = model_outputs["struct_logits"].reshape(bsz, seq_len, -1, 2)
+            struct_logits = model_outputs["struct_logits"].reshape(
+                bsz, seq_len, -1, 2
+            )
         else:
             model_outputs = self.forward(
                 input_ids=x_t,
                 single_modality=single_modality_index,
             )
             aatype_logits = model_outputs["aatype_logits"]
-            struct_logits = (
-                model_outputs["struct_logits"]
-                .reshape(bsz, seq_len, -1, 2)
+            struct_logits = model_outputs["struct_logits"].reshape(
+                bsz, seq_len, -1, 2
             )
 
         num_timesteps = self.cfg.num_diffusion_timesteps
@@ -285,17 +310,28 @@ class DPLM2Bit(DPLM2):
         aatype_weight = aatype_weight.expand(aatype_target.size())
 
         return (
-            {"aatype": aatype_logits, "struct": struct_logits}, # model pred logits
-            {"aatype": aatype_target, "struct": struct_target}, # training targets
-            {                                                   # training loss mask
+            {
+                "aatype": aatype_logits,
+                "struct": struct_logits,
+            },  # model pred logits
+            {
+                "aatype": aatype_target,
+                "struct": struct_target,
+            },  # training targets
+            {  # training loss mask
                 "aatype": aatype_noised["mask"],
                 "struct": struct_noised["mask"],
             },
-            {"aatype": aatype_weight, "struct": struct_weight}, # training loss weight
+            {
+                "aatype": aatype_weight,
+                "struct": struct_weight,
+            },  # training loss weight
         )
 
     def _self_mixup(self, input_ids, model_pred, non_special_sym_mask=None):
-        replace_mask = input_ids.eq(self.aa_mask_id) | input_ids.eq(self.struct_mask_id)
+        replace_mask = input_ids.eq(self.aa_mask_id) | input_ids.eq(
+            self.struct_mask_id
+        )
 
         mixup_input_ids = torch.where(replace_mask, model_pred, input_ids)
         return mixup_input_ids
@@ -339,7 +375,9 @@ class DPLM2Bit(DPLM2):
                 aatype_logits, struct_logits, temperature=0.0
             )
         elif sampling_strategy.startswith("annealing"):
-            max_temp, min_temp = map(float, sampling_strategy.split("@")[1].split(":"))
+            max_temp, min_temp = map(
+                float, sampling_strategy.split("@")[1].split(":")
+            )
             rate = 1 - step / max_step
             temperature = min_temp + (max_temp - min_temp) * rate
             _tokens, _scores = self.sample_from_logits(
@@ -403,7 +441,10 @@ class DPLM2Bit(DPLM2):
         # 0) encoding
         encoder_out = self.forward_encoder(input_tokens)
         # 1) initialized from all mask tokens
-        initial_output_tokens, initial_output_scores = self.initialize_output_tokens(
+        (
+            initial_output_tokens,
+            initial_output_scores,
+        ) = self.initialize_output_tokens(
             input_tokens, encoder_out=encoder_out, partial_masks=partial_masks
         )
         prev_decoder_out = dict(
@@ -439,7 +480,11 @@ class DPLM2Bit(DPLM2):
                 prev_decoder_out["output_tokens"], partial_masks=partial_masks
             )
 
-            output_masks, result_tokens, result_scores = self._reparam_decoding(
+            (
+                output_masks,
+                result_tokens,
+                result_scores,
+            ) = self._reparam_decoding(
                 output_tokens=prev_decoder_out["output_tokens"].clone(),
                 output_scores=prev_decoder_out["output_scores"].clone(),
                 cur_tokens=output_tokens.clone(),
@@ -476,7 +521,9 @@ class DPLM2Bit(DPLM2):
         }
 
     def prepare_for_struct_tokenizer(self, decoder_out, non_special_sym_mask):
-        lm_output_struct_tokens = decoder_out["output_tokens"].chunk(2, dim=1)[0]
+        lm_output_struct_tokens = decoder_out["output_tokens"].chunk(2, dim=1)[
+            0
+        ]
         non_bos_eos_mask = lm_output_struct_tokens.ne(
             self.struct_eos_id
         ) & lm_output_struct_tokens.ne(self.struct_bos_id)
@@ -492,7 +539,9 @@ class DPLM2Bit(DPLM2):
             - self.struct_vocab_offset
         )
         struct_tokens[~res_mask.bool()] = 0
-        quant = self.struct_tokenizer.quantize.get_codebook_entry(struct_tokens)
+        quant = self.struct_tokenizer.quantize.get_codebook_entry(
+            struct_tokens
+        )
         decoder_out["res_mask"] = res_mask
         decoder_out["final_struct_feature"] = quant
 

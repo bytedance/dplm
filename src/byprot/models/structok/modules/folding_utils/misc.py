@@ -49,7 +49,9 @@ def encode_sequence(
     if residue_index_offset > 0:
         start = 0
         for i, chain in enumerate(chains):
-            residx[start : start + len(chain) + len(chain_linker)] += i * residue_index_offset
+            residx[start : start + len(chain) + len(chain_linker)] += (
+                i * residue_index_offset
+            )
             start += len(chain) + len(chain_linker)
 
     linker_mask = torch.ones_like(encoded, dtype=torch.float32)
@@ -72,13 +74,20 @@ def batch_encode_sequences(
     sequences: T.Sequence[str],
     residue_index_offset: T.Optional[int] = 512,
     chain_linker: T.Optional[str] = "G" * 25,
-) -> T.Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> T.Tuple[
+    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
+]:
     aatype_list = []
     residx_list = []
     linker_mask_list = []
     chain_index_list = []
     for seq in sequences:
-        aatype_seq, residx_seq, linker_mask_seq, chain_index_seq = encode_sequence(
+        (
+            aatype_seq,
+            residx_seq,
+            linker_mask_seq,
+            chain_index_seq,
+        ) = encode_sequence(
             seq,
             residue_index_offset=residue_index_offset,
             chain_linker=chain_linker,
@@ -104,11 +113,13 @@ def output_to_pdb(output: T.Dict) -> T.List[str]:
     # atom14_to_atom37 must be called first, as it fails on latest numpy if the
     # input is a numpy array. It will work if the input is a torch tensor.
     if "atom37_positions" not in output:
-        final_atom37_positions = atom14_to_atom37(output["positions"][-1], output)
+        final_atom37_positions = atom14_to_atom37(
+            output["positions"][-1], output
+        )
     else:
         final_atom37_positions = output["atom37_positions"]
     if "atom37_mask" not in output:
-        final_atom37_mask = output["atom37_atom_exists"] 
+        final_atom37_mask = output["atom37_atom_exists"]
     else:
         final_atom37_mask = output["atom37_mask"]
     # adjust Oxygens
@@ -137,29 +148,36 @@ def output_to_pdb(output: T.Dict) -> T.List[str]:
             atom_mask=mask,
             residue_index=resid,
             b_factors=output["plddt"][i],
-            chain_index=output["chain_index"][i] if "chain_index" in output else None,
+            chain_index=output["chain_index"][i]
+            if "chain_index" in output
+            else None,
         )
         pdbs.append(to_pdb(pred))
     return pdbs
 
 
-def collate_dense_tensors(samples: T.List[torch.Tensor], pad_v: float = 0) -> torch.Tensor:
-    """
-    Takes a list of tensors with the following dimensions:
-        [(d_11,       ...,           d_1K),
-         (d_21,       ...,           d_2K),
-         ...,
-         (d_N1,       ...,           d_NK)]
-    and stack + pads them into a single tensor of:
-    (N, max_i=1,N { d_i1 }, ..., max_i=1,N {diK})
+def collate_dense_tensors(
+    samples: T.List[torch.Tensor], pad_v: float = 0
+) -> torch.Tensor:
+    """Takes a list of tensors with the following dimensions:
+
+    [(d_11,       ...,           d_1K),      (d_21,       ..., d_2K),      ...,
+    (d_N1,       ...,           d_NK)] and stack + pads them into a single
+    tensor of: (N, max_i=1,N { d_i1 }, ..., max_i=1,N {diK})
     """
     if len(samples) == 0:
         return torch.Tensor()
     if len(set(x.dim() for x in samples)) != 1:
-        raise RuntimeError(f"Samples has varying dimensions: {[x.dim() for x in samples]}")
-    (device,) = tuple(set(x.device for x in samples))  # assumes all on same device
+        raise RuntimeError(
+            f"Samples has varying dimensions: {[x.dim() for x in samples]}"
+        )
+    (device,) = tuple(
+        set(x.device for x in samples)
+    )  # assumes all on same device
     max_shape = [max(lst) for lst in zip(*[x.shape for x in samples])]
-    result = torch.empty(len(samples), *max_shape, dtype=samples[0].dtype, device=device)
+    result = torch.empty(
+        len(samples), *max_shape, dtype=samples[0].dtype, device=device
+    )
     result.fill_(pad_v)
     for i in range(len(samples)):
         result_i = result[i]
@@ -190,8 +208,7 @@ class Attention(nn.Module):
         torch.nn.init.zeros_(self.o_proj.bias)
 
     def forward(self, x, mask=None, bias=None, indices=None):
-        """
-        Basic self attention with optional mask and external pairwise bias.
+        """Basic self attention with optional mask and external pairwise bias.
         To handle sequences of different lengths, use mask.
 
         Inputs:
@@ -203,7 +220,9 @@ class Attention(nn.Module):
           sequence projection (B x L x embed_dim), attention maps (B x L x L x num_heads)
         """
 
-        t = rearrange(self.proj(x), "... l (h c) -> ... h l c", h=self.num_heads)
+        t = rearrange(
+            self.proj(x), "... l (h c) -> ... h l c", h=self.num_heads
+        )
         q, k, v = t.chunk(3, dim=-1)
 
         q = self.rescale_factor * q
@@ -215,7 +234,9 @@ class Attention(nn.Module):
 
         # Do not attend to padding tokens.
         if mask is not None:
-            mask = repeat(mask, "... lk -> ... h lq lk", h=self.num_heads, lq=q.shape[-2])
+            mask = repeat(
+                mask, "... lk -> ... h lq lk", h=self.num_heads, lq=q.shape[-2]
+            )
             a = a.masked_fill(mask == False, -np.inf)
 
         a = F.softmax(a, dim=-1)
@@ -231,10 +252,8 @@ class Attention(nn.Module):
 
 
 class Dropout(nn.Module):
-    """
-    Implementation of dropout with the ability to share the dropout mask
-    along a particular dimension.
-    """
+    """Implementation of dropout with the ability to share the dropout mask
+    along a particular dimension."""
 
     def __init__(self, r: float, batch_dim: T.Union[int, T.List[int]]):
         super(Dropout, self).__init__()

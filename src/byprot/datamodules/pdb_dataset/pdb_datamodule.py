@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
 """PDB data loader."""
 
 import functools as fn
@@ -20,6 +23,7 @@ from byprot import utils
 from byprot.datamodules import register_datamodule
 from byprot.datamodules.dataset.data_utils import MaxTokensBatchSampler
 from byprot.datamodules.pdb_dataset import utils as du
+
 from .utils import aatype_to_seq, seq_to_aatype
 
 log = utils.get_logger(__name__)
@@ -31,7 +35,6 @@ SHAPE_SCHEMA["gvp_feat"] = SHAPE_SCHEMA["residue_index"]
 
 from textwrap import wrap
 
-# struct_seq_to_ids = lambda struct_seq: [int(elem) for elem in wrap(struct_seq.strip(), 3)]
 struct_seq_to_ids = lambda struct_seq: [
     int(elem) for elem in struct_seq.strip().split(",")
 ]

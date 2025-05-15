@@ -1,22 +1,32 @@
-
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
 
-from lightning.pytorch.loggers.wandb import WandbLogger
-from lightning.pytorch.loggers.logger import Logger
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Mapping, Optional, Union
 from pathlib import Path
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Union,
+)
+
 from lightning.fabric.utilities.types import _PATH
+from lightning.pytorch.loggers.logger import Logger
+from lightning.pytorch.loggers.wandb import WandbLogger
 
 if TYPE_CHECKING:
     from wandb import Artifact
     from wandb.sdk.lib import RunDisabled
     from wandb.wandb_run import Run
 
-from lightning.pytorch.utilities.exceptions import MisconfigurationException
-from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
 import os
+
+from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
+from lightning.pytorch.utilities.exceptions import MisconfigurationException
 
 
 class ByProtWandbLogger(WandbLogger):

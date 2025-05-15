@@ -1,0 +1,31 @@
+_target_: pdb
+
+# data_dir: ${data_dir} # data_dir is specified in config.yaml
+# CSV for path and metadata to training examples.
+dataset:
+  seed: 42
+  cache_num_res: 0
+  samples_per_eval_length: 5
+  crop_size: 128
+  eval_num_lengths: 8
+  eval_max_len: 256
+  data_dir: /root/research/data/protein/processed_pdb
+  csv_path: ${.data_dir}/metadata.csv
+  train_split: pdb
+  valid_split: cameo2022
+  filter:
+    max_len: 128
+    min_len: 0
+    # Selects a subset of examples. Useful for debugging.
+    subset: null
+    allowed_oligomer: [monomeric]
+    max_helix_percent: 1.0
+    max_loop_percent: 0.5
+    min_beta_percent: -1.0
+    rog_quantile: 0.96
+loader:
+  num_workers: 8
+  prefetch_factor: 10
+sampler:
+  max_batch_size: 100
+  max_num_res_squared: 500_000

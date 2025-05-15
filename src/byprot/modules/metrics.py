@@ -1,17 +1,21 @@
-
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
 
 import math
+from functools import partial
+
+import numpy as np
 import torch
 import torch.nn.functional as F
-from functools import partial
-import numpy as np
 
 
 def luost_rmsd(res_list1: list, res_list2: list):
-    res_short, res_long = (res_list1, res_list1) if len(res_list1) < len(res_list2) else (res_list2, res_list1)
+    res_short, res_long = (
+        (res_list1, res_list1)
+        if len(res_list1) < len(res_list2)
+        else (res_list2, res_list1)
+    )
     M, N = len(res_short), len(res_long)
 
     def d(i, j):
@@ -29,12 +33,9 @@ def luost_rmsd(res_list1: list, res_list2: list):
 
     for i in range(M - 2, -1, -1):
         for j in range((N - (M - i)) - 1, -1, -1):
-            SD[i, j] = min(
-                d(i, j) + SD[i + 1, j + 1],
-                SD[i, j + 1]
-            )
+            SD[i, j] = min(d(i, j) + SD[i + 1, j + 1], SD[i, j + 1])
 
-    min_SD = SD[0, :N - M + 1].min()
+    min_SD = SD[0, : N - M + 1].min()
     best_RMSD = np.sqrt(min_SD / M)
     return best_RMSD
 
@@ -50,16 +51,17 @@ def rmsd(pred, target, mask=None):
     return np.mean(rmsd)
 
 
-def accuracy(pred, target, mask=None, reduction='all'):
+def accuracy(pred, target, mask=None, reduction="all"):
     assert pred.shape == target.shape
     if mask is None:
         mask = torch.ones_like(pred, dtype=torch.bool)
-    
+
     return (pred[mask] == target[mask]).sum() / mask.sum()
+
 
 def accuracy_per_sample(pred, target, mask=None):
     assert pred.shape == target.shape
-    bsz = target.shape[0] 
+    bsz = target.shape[0]
 
     if mask is None:
         mask = torch.ones_like(pred, dtype=torch.bool)
@@ -69,4 +71,3 @@ def accuracy_per_sample(pred, target, mask=None):
     mask = mask.view(bsz, -1)
 
     return ((pred == target) * mask).sum(1) / mask.sum(1)
-

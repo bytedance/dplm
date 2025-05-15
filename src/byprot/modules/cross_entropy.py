@@ -1,4 +1,3 @@
-
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
@@ -8,7 +7,9 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 
-def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=True):
+def label_smoothed_nll_loss(
+    lprobs, target, epsilon, ignore_index=None, reduce=True
+):
     flag = False
     if target.dim() == lprobs.dim() - 1:
         flag = True
@@ -36,9 +37,9 @@ def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=T
 class CrossEntropyLoss(nn.CrossEntropyLoss):
     def forward(self, scores: Tensor, target: Tensor, mask=None) -> Tensor:
         """
-          scores: [N, ..., C], unnormalized scores
-          target: [N, ...]
-          mask: [N, ...], where elements with `True` are allowed and `False` are masked-out
+        scores: [N, ..., C], unnormalized scores
+        target: [N, ...]
+        mask: [N, ...], where elements with `True` are allowed and `False` are masked-out
         """
         n_tokens = target.numel()
         n_nonpad_tokens = target.ne(self.ignore_index).long().sum()
@@ -73,23 +74,30 @@ class CrossEntropyLoss(nn.CrossEntropyLoss):
         ppl = torch.exp(nll_loss / sample_size)
 
         logging_output = {
-            'nll_loss_sum': nll_loss.data,
-            'loss_sum': loss.data,
-            'ppl': ppl.data,
-            'bsz': bsz,
-            'sample_size': sample_size,
-            'sample_ratio': sample_size / n_tokens,
-            'nonpad_ratio': n_nonpad_tokens / n_tokens
+            "nll_loss_sum": nll_loss.data,
+            "loss_sum": loss.data,
+            "ppl": ppl.data,
+            "bsz": bsz,
+            "sample_size": sample_size,
+            "sample_ratio": sample_size / n_tokens,
+            "nonpad_ratio": n_nonpad_tokens / n_tokens,
         }
         return loss_avg, logging_output
 
 
 class Coord2SeqCrossEntropyLoss(nn.CrossEntropyLoss):
-    def forward(self, scores: Tensor, target: Tensor, label_mask=None, coord_mask=None, weights=None) -> Tensor:
+    def forward(
+        self,
+        scores: Tensor,
+        target: Tensor,
+        label_mask=None,
+        coord_mask=None,
+        weights=None,
+    ) -> Tensor:
         """
-          scores: [N, L, C], unnormalized scores
-          target: [N, L]
-          coord_mask: FloatTensor [N, L], where elements with `True` are allowed and `False` are masked-out
+        scores: [N, L, C], unnormalized scores
+        target: [N, L]
+        coord_mask: FloatTensor [N, L], where elements with `True` are allowed and `False` are masked-out
         """
         if label_mask is None:
             label_mask = coord_mask
@@ -98,7 +106,9 @@ class Coord2SeqCrossEntropyLoss(nn.CrossEntropyLoss):
 
         n_tokens = target.numel()
         if self.ignore_index is not None:
-            sample_size = n_nonpad_tokens = target.ne(self.ignore_index).float().sum()
+            sample_size = n_nonpad_tokens = (
+                target.ne(self.ignore_index).float().sum()
+            )
         else:
             sample_size = n_nonpad_tokens = n_tokens
 
@@ -119,7 +129,9 @@ class Coord2SeqCrossEntropyLoss(nn.CrossEntropyLoss):
         # ignoring those position with missing coords (as nan)
         if label_mask is not None:
             label_mask = label_mask.float()
-            sample_size = label_mask.sum()  # sample size should be set to valid coordinates
+            sample_size = (
+                label_mask.sum()
+            )  # sample size should be set to valid coordinates
             loss = (loss * label_mask).sum() / sample_size
             nll_loss = (nll_loss * label_mask).sum() / sample_size
         else:
@@ -128,33 +140,40 @@ class Coord2SeqCrossEntropyLoss(nn.CrossEntropyLoss):
         ppl = torch.exp(nll_loss)
 
         logging_output = {
-            'nll_loss': nll_loss.data,
-            'ppl': ppl.data, # torch.mean(ppl).data,
-            'fullseq_loss': fullseq_loss.data,
-            'fullseq_nll_loss': fullseq_nll_loss.data,
-            'bsz': bsz,
-            'sample_size': sample_size,
-            'sample_ratio': sample_size / n_tokens,
-            'nonpad_ratio': n_nonpad_tokens / n_tokens
+            "nll_loss": nll_loss.data,
+            "ppl": ppl.data,  # torch.mean(ppl).data,
+            "fullseq_loss": fullseq_loss.data,
+            "fullseq_nll_loss": fullseq_nll_loss.data,
+            "bsz": bsz,
+            "sample_size": sample_size,
+            "sample_ratio": sample_size / n_tokens,
+            "nonpad_ratio": n_nonpad_tokens / n_tokens,
         }
         return loss, logging_output
 
 
 class RDMCrossEntropyLoss(nn.CrossEntropyLoss):
-    def forward(self, scores: Tensor, target: Tensor, label_mask=None, weights=None,
-                cal_constant_loss=False,
-                watch_t1_t2_loss=False,
-                ) -> Tensor:
+    def forward(
+        self,
+        scores: Tensor,
+        target: Tensor,
+        label_mask=None,
+        weights=None,
+        cal_constant_loss=False,
+        watch_t1_t2_loss=False,
+    ) -> Tensor:
         """
-          scores: [N, L, C], unnormalized scores
-          target: [N, L]
-          coord_mask: FloatTensor [N, L], where elements with `True` are allowed and `False` are masked-out
+        scores: [N, L, C], unnormalized scores
+        target: [N, L]
+        coord_mask: FloatTensor [N, L], where elements with `True` are allowed and `False` are masked-out
         """
         bsz, num_classes = scores.shape[0], scores.shape[-1]
 
         n_tokens = target.numel()
         if self.ignore_index is not None:
-            sample_size = n_nonpad_tokens = target.ne(self.ignore_index).float().sum()
+            sample_size = n_nonpad_tokens = (
+                target.ne(self.ignore_index).float().sum()
+            )
         else:
             sample_size = n_nonpad_tokens = n_tokens
 
@@ -177,31 +196,33 @@ class RDMCrossEntropyLoss(nn.CrossEntropyLoss):
             t1_mask, t2_mask = label_mask.chunk(2)
             t1_loss = (t1_loss * t1_mask).sum() / (t1_mask.sum())
             t2_loss = (t2_loss * t2_mask).sum() / (t2_mask.sum())
-            
+
         # use coord masked loss for model training,
         # ignoring those position with missing coords (as nan)
         if label_mask is not None:
             label_mask = label_mask.float()
-            sample_size = label_mask.sum()  # sample size should be set to valid coordinates
+            sample_size = (
+                label_mask.sum()
+            )  # sample size should be set to valid coordinates
             loss = (loss * label_mask).sum() / sample_size
             nll_loss = (nll_loss * label_mask).sum() / sample_size
         else:
             loss, nll_loss = fullseq_loss, fullseq_nll_loss
 
         ppl = torch.exp(nll_loss)
-        
+
         logging_output = {
-            'nll_loss': nll_loss.data,
-            'ppl': ppl.data,
-            'fullseq_loss': fullseq_loss.data,
-            'fullseq_nll_loss': fullseq_nll_loss.data,
-            'bsz': bsz,
-            'sample_size': sample_size,
-            'sample_ratio': sample_size / n_tokens,
-            'nonpad_ratio': n_nonpad_tokens / n_tokens,
-            'weight_diff_loss': loss.data
+            "nll_loss": nll_loss.data,
+            "ppl": ppl.data,
+            "fullseq_loss": fullseq_loss.data,
+            "fullseq_nll_loss": fullseq_nll_loss.data,
+            "bsz": bsz,
+            "sample_size": sample_size,
+            "sample_ratio": sample_size / n_tokens,
+            "nonpad_ratio": n_nonpad_tokens / n_tokens,
+            "weight_diff_loss": loss.data,
         }
-        
+
         if cal_constant_loss:
             constant_weights = weights.new_ones(size=weights.size())
             constant_loss, _ = label_smoothed_nll_loss(
@@ -213,10 +234,10 @@ class RDMCrossEntropyLoss(nn.CrossEntropyLoss):
             )
             constant_loss = constant_loss * constant_weights
             constant_loss = (constant_loss * label_mask).sum() / sample_size
-            logging_output['constant_diff_loss'] = constant_loss.data
+            logging_output["constant_diff_loss"] = constant_loss.data
 
         if watch_t1_t2_loss:
-            logging_output['weight_diff_t1_loss'] = t1_loss.data
-            logging_output['weight_diff_t2_loss'] = t2_loss.data
-        
+            logging_output["weight_diff_t1_loss"] = t1_loss.data
+            logging_output["weight_diff_t2_loss"] = t2_loss.data
+
         return loss, logging_output

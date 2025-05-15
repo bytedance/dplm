@@ -11,5 +11,3 @@ defaults:
 
 # name of the run determines folder name in logs
 name: "fixedbb/protein_mpnn-cath_esm"
-
-

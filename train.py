@@ -1,4 +1,3 @@
-
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
@@ -44,7 +43,11 @@ import hydra
 from omegaconf import DictConfig
 
 
-@hydra.main(version_base='1.1', config_path=f"{root}/configs", config_name="config.yaml")
+@hydra.main(
+    version_base="1.1",
+    config_path=f"{root}/configs",
+    config_name="config.yaml",
+)
 def main(config: DictConfig):
 
     # Imports can be nested inside @hydra.main to optimize tab completion

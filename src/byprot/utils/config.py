@@ -1,19 +1,15 @@
-
-# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
-# SPDX-License-Identifier: Apache-2.0
-
-
 import importlib
+import logging
 import os
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, List, Sequence
-import logging
-from pytorch_lightning.utilities import rank_zero_only
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
+from pytorch_lightning.utilities import rank_zero_only
+
 
 def get_logger(name=__name__) -> logging.Logger:
     """Initializes multi-GPU-friendly python command line logger."""
@@ -54,7 +50,9 @@ def merge_config(default_cfg, override_cfg):
 
 
 def load_yaml_config(fpath: str) -> OmegaConf:
-    return OmegaConf.load(fpath)
+    cfg = OmegaConf.load(fpath)
+    OmegaConf.resolve(cfg)
+    return cfg
 
 
 def parse_cli_override_args():
@@ -62,7 +60,7 @@ def parse_cli_override_args():
     print(_overrides)
     override_dict = {}
     for kk, vv in _overrides.items():
-        key = kk if not kk.startswith('+') else kk[1:]
+        key = kk if not kk.startswith("+") else kk[1:]
         if key not in override_dict:
             override_dict[key] = vv
         else:
@@ -74,9 +72,14 @@ def parse_cli_override_args():
 def resolve_experiment_config(config: DictConfig):
     # Load train config from existing Hydra experiment
     if config.experiment_path is not None:
-        config.experiment_path = hydra.utils.to_absolute_path(config.experiment_path)
-        experiment_config = OmegaConf.load(os.path.join(config.experiment_path, '.hydra', 'config.yaml'))
+        config.experiment_path = hydra.utils.to_absolute_path(
+            config.experiment_path
+        )
+        experiment_config = OmegaConf.load(
+            os.path.join(config.experiment_path, ".hydra", "config.yaml")
+        )
         from omegaconf import open_dict
+
         with open_dict(config):
             config.datamodule = experiment_config.datamodule
             config.model = experiment_config.model
@@ -119,11 +122,13 @@ def instantiate_from_config(cfg: OmegaConf, group=None, **override_kwargs):
         return hydra.utils.instantiate(cfg, **override_kwargs)
     else:
         from . import registry
-        _target_ = cfg.pop('_target_')
+
+        _target_ = cfg.pop("_target_")
         target = registry.get_module(group_name=group, module_name=_target_)
         if target is None:
             raise KeyError(
-                f'{_target_} is not a registered <{group}> class [{registry.get_registered_modules(group)}].')
+                f"{_target_} is not a registered <{group}> class [{registry.get_registered_modules(group)}]."
+            )
         target = _convert_target_to_string(target)
         log.info(f"    Resolving {group} <{_target_}> -> <{target}>")
 

@@ -7,20 +7,22 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
-from byprot import utils
-from byprot.datamodules import register_datamodule
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 
+from byprot import utils
+from byprot.datamodules import register_datamodule
 from byprot.datamodules.dataset.cath import CATH
-from byprot.datamodules.dataset.data_utils import Alphabet, MaxTokensBatchSampler
+from byprot.datamodules.dataset.data_utils import (
+    Alphabet,
+    MaxTokensBatchSampler,
+)
 
 log = utils.get_logger(__name__)
 
 
 @register_datamodule("cath")
 class CATHDataModule(LightningDataModule):
-
     def __init__(
         self,
         data_dir: str = "data/",
@@ -51,11 +53,13 @@ class CATHDataModule(LightningDataModule):
         self.test_data: Optional[Dataset] = None
 
     def setup(self, stage: Optional[str] = None):
-        """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
+        """Load data. Set variables: `self.data_train`, `self.data_val`,
+        `self.data_test`.
 
-        This method is called by lightning when doing `trainer.fit()` and `trainer.test()`,
-        so be careful not to execute the random split twice! The `stage` can be used to
-        differentiate whether it's called before trainer.fit()` or `trainer.test()`.
+        This method is called by lightning when doing `trainer.fit()` and
+        `trainer.test()`, so be careful not to execute the random split twice!
+        The `stage` can be used to differentiate whether it's called before
+        trainer.fit()` or `trainer.test()`.
         """
 
         # load datasets only if they're not loaded already
@@ -105,7 +109,9 @@ class CATHDataModule(LightningDataModule):
     def train_dataloader(self):
         if not hasattr(self, "train_batch_sampler"):
             self.train_batch_sampler = self._build_batch_sampler(
-                self.train_dataset, max_tokens=self.hparams.max_tokens, shuffle=True
+                self.train_dataset,
+                max_tokens=self.hparams.max_tokens,
+                shuffle=True,
             )
         return DataLoader(
             dataset=self.train_dataset,
@@ -132,7 +138,9 @@ class CATHDataModule(LightningDataModule):
         return DataLoader(
             dataset=self.test_dataset,
             batch_sampler=self._build_batch_sampler(
-                self.test_dataset, max_tokens=self.hparams.max_tokens, distributed=False
+                self.test_dataset,
+                max_tokens=self.hparams.max_tokens,
+                distributed=False,
             ),
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,

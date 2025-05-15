@@ -1,4 +1,3 @@
-
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
@@ -29,7 +28,11 @@ from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning.utilities.seed import isolate_rng
 
 from . import strategies
-from .config import instantiate_from_config, load_yaml_config, resolve_experiment_config
+from .config import (
+    instantiate_from_config,
+    load_yaml_config,
+    resolve_experiment_config,
+)
 
 
 def get_logger(name=__name__) -> logging.Logger:
@@ -61,7 +64,9 @@ def load_from_experiment(experiment_save_dir, ckpt="best.ckpt"):
     cfg = load_yaml_config(str(cfg_path))
     cfg.ckpt_path = Path(experiment_save_dir, "checkpoints", ckpt)
 
-    pl_module = instantiate_from_config(cfg=cfg.task, group="task", model=cfg.model)
+    pl_module = instantiate_from_config(
+        cfg=cfg.task, group="task", model=cfg.model
+    )
     pl_module.load_from_ckpt(str(cfg.ckpt_path))
 
     return pl_module, cfg
@@ -239,7 +244,9 @@ def common_pipeline(config, training=False):
 
                 # FIXME: a hack to avoid tensorboard saving hparams error at first run
                 if isinstance(lg, TensorBoardLogger):
-                    hparams_file = os.path.join(lg.log_dir, lg.NAME_HPARAMS_FILE)
+                    hparams_file = os.path.join(
+                        lg.log_dir, lg.NAME_HPARAMS_FILE
+                    )
                     os.makedirs(lg.log_dir, exist_ok=True)
                     open(hparams_file, "w").close()
 
@@ -264,7 +271,9 @@ def resolve_ckpt_path(ckpt_dir, ckpt_path):
     # if not absolute path, it should be inferred from current working directory or ckeckpoint directory
     if not os.path.isabs(ckpt_path):
         # if ckpt_path is in cwd
-        if os.path.exists(os.path.join(hydra.utils.get_original_cwd(), ckpt_path)):
+        if os.path.exists(
+            os.path.join(hydra.utils.get_original_cwd(), ckpt_path)
+        ):
             ckpt_path = os.path.abspath(
                 os.path.join(hydra.utils.get_original_cwd(), ckpt_path)
             )
@@ -334,11 +343,15 @@ def import_modules(models_dir, namespace, excludes=[]):
             and not file.startswith(".")
             and (file.endswith(".py") or os.path.isdir(path))
         ):
-            module_name = file[: file.find(".py")] if file.endswith(".py") else file
+            module_name = (
+                file[: file.find(".py")] if file.endswith(".py") else file
+            )
 
             _namespace = path.replace("/", ".")
             _namespace = _namespace[
-                _namespace.find(namespace) : _namespace.rfind("." + module_name)
+                _namespace.find(namespace) : _namespace.rfind(
+                    "." + module_name
+                )
             ]
             importlib.import_module(_namespace + "." + module_name)
 
@@ -355,8 +368,8 @@ def get_git_revision_hash() -> str:
 
 
 def seed_everything(seed, verbose=False) -> int:
-    """Function that sets seed for pseudo-random number generators in: pytorch, numpy, python.random In addition,
-    sets the following environment variables:
+    """Function that sets seed for pseudo-random number generators in: pytorch,
+    numpy, python.random In addition, sets the following environment variables:
 
     - `PL_GLOBAL_SEED`: will be passed to spawned subprocesses (e.g. ddp_spawn backend).
     - `PL_SEED_WORKERS`: (optional) is set to 1 if ``workers=True``.

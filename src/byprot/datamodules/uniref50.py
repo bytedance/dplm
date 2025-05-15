@@ -3,19 +3,28 @@
 
 
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+)
 
 import numpy as np
 import torch
-from byprot import utils
-from byprot.datamodules import register_datamodule
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 
+from byprot import utils
+from byprot.datamodules import register_datamodule
 from byprot.datamodules.dataset.uniref import (
+    Subset,
     UniRefDataset,
     setup_dataloader,
-    Subset,
 )
 
 log = utils.get_logger(__name__)
@@ -47,11 +56,13 @@ class UniRefDataModule(LightningDataModule):
         self.test_data: Optional[Dataset] = None
 
     def setup(self, stage: Optional[str] = None):
-        """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
+        """Load data. Set variables: `self.data_train`, `self.data_val`,
+        `self.data_test`.
 
-        This method is called by lightning when doing `trainer.fit()` and `trainer.test()`,
-        so be careful not to execute the random split twice! The `stage` can be used to
-        differentiate whether it's called before trainer.fit()` or `trainer.test()`.
+        This method is called by lightning when doing `trainer.fit()` and
+        `trainer.test()`, so be careful not to execute the random split twice!
+        The `stage` can be used to differentiate whether it's called before
+        trainer.fit()` or `trainer.test()`.
         """
 
         # load datasets only if they're not loaded already

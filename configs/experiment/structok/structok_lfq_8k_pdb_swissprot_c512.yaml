@@ -1,0 +1,126 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - /datamodule: pdb
+  - /callbacks: structok
+  - /trainer: default
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+# name of the run determines folder name in logs
+project: "structok"
+name: "structok/dplm2_structok"
+
+datamodule:
+  dataset:
+    seed: 42
+    cache_num_res: 0
+    crop_size: 512
+    eval_max_len: ${.crop_size}
+    data_dir: ${paths.data_dir}
+    csv_path: ${.data_dir}/metadata.pdb_afdb_cameo.plddt.structok_lfq.csv
+    train_split: [pdb, afdb_swissprot]
+    valid_split: [cameo2022]
+    load_gvp_feat: false
+    filter:
+      max_len: 1024
+      min_len: 60
+      # Selects a subset of examples. Useful for debugging.
+      subset: null
+      allowed_oligomer: [monomeric]
+      # allowed_oligomer: null
+      max_helix_percent: 1.0
+      max_loop_percent: 0.5
+      min_beta_percent: -1.0
+      rog_quantile: 0.96
+      cluster_sample: false
+      conf_masking: false #true
+  loader:
+    batch_size: 5
+    num_workers: 8
+    prefetch_factor: 10
+  sampler:
+    max_batch_size: 20
+    max_num_res_squared: 1_000_000
+
+model:
+  _target_: structok_lfq
+  codebook_config:
+    freeze: false
+    num_codes: 8192 # 2^13
+    embed_dim: 13
+    entropy_loss_weight: 0.1
+    commitment_loss_weight: 0.25
+  encoder_config:
+    freeze: true
+  decoder_config:
+    input_dim: 128
+    trunk:
+      num_blocks: 4
+      sequence_state_dim: 128
+      pairwise_state_dim: 32
+      max_recycles: 1
+      structure_module:
+        c_s: 128
+        c_z: 32
+        no_blocks: 8
+        no_angles: 7
+      gradient_checkpointing: false
+task:
+  _target_: struct_tokenizer/structok
+  learning:
+    pretrained_model_path: null
+    no_pretrained_decoder: false
+    restore_optimizer: false
+  criterion:
+    _target_: byprot.models.structok.modules.loss.StructureVQLoss
+    config:
+      rec_loss:
+        eps: 1e-06
+        violation:
+          weight: 0.3
+      codebook_loss:
+        weight: 1.0
+        num_codes: ${model.codebook_config.num_codes}
+  optimizer:
+    type: adamw
+    _partial_: true
+    lr: ${train.lr}
+    betas:
+      - 0.9
+      - 0.98
+    weight_decay: 0.01
+  lr_scheduler:
+    type: polynomial
+    warmup_steps: 1
+    total_steps: ${trainer.max_steps}
+    lr: ${train.lr}
+    lr_end: 1e-7
+    warmup_init_lr: 1e-07
+    power: 1
+
+train:
+  seed: 42
+  lr: 0.0005
+  monitor: "val/loss"
+  mode: "min"
+  patience: 1000
+
+trainer:
+  min_epochs: 10
+  max_epochs: 10000
+  gradient_clip_val: 1.0
+  # val_check_interval: 10
+  num_sanity_val_steps: -1
+  reload_dataloaders_every_n_epochs: 1
+  use_distributed_sampler: false
+  max_steps: 200_000
+  accumulate_grad_batches: 1
+  check_val_every_n_epoch: null
+  val_check_interval: 1000
+  enable_progress_bar: true
+  num_nodes: 1

@@ -1,4 +1,3 @@
-
 # Copyright (c) 2023 Meta Platforms, Inc. and affiliates
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
@@ -17,19 +16,18 @@
 # LICENSE file in the root directory of this source tree.
 
 
-from pathlib import Path
-import re
-import sys,os
 import argparse
+import glob
 import logging
+import os
+import re
 import sys
 import typing as T
 from pathlib import Path
 from timeit import default_timer as timer
 
-import torch
-
 import esm
+import torch
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -56,7 +54,10 @@ def read_fasta(
 ):
     with open(path, "r") as f:
         for result in read_alignment_lines(
-            f, keep_gaps=keep_gaps, keep_insertions=keep_insertions, to_upper=to_upper
+            f,
+            keep_gaps=keep_gaps,
+            keep_insertions=keep_insertions,
+            to_upper=to_upper,
         ):
             yield result
 
@@ -79,7 +80,7 @@ def read_alignment_lines(
     for line in lines:
         # Line may be empty if seq % file_line_width == 0
         if len(line) > 0 and line[0] == ">":
-            if seq is not None and 'X' not in seq:
+            if seq is not None and "X" not in seq:
                 yield desc, parse(seq)
             desc = line.strip().lstrip(">")
             seq = ""
@@ -87,7 +88,7 @@ def read_alignment_lines(
             assert isinstance(seq, str)
             seq += line.strip()
     assert isinstance(seq, str) and isinstance(desc, str)
-    if 'X' not in seq:
+    if "X" not in seq:
         yield desc, parse(seq)
 
 
@@ -96,7 +97,10 @@ def enable_cpu_offloading(model):
     from torch.distributed.fsdp.wrap import enable_wrap, wrap
 
     torch.distributed.init_process_group(
-        backend="nccl", init_method="tcp://localhost:9999", world_size=1, rank=0
+        backend="nccl",
+        init_method="tcp://localhost:9999",
+        world_size=1,
+        rank=0,
     )
 
     wrapper_kwargs = dict(cpu_offload=CPUOffload(offload_params=True))
@@ -139,22 +143,27 @@ def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-i",
-        "--fasta",
+        "--fasta_dir",
         help="Path directory to input FASTA file",
         type=Path,
         required=True,
-        default='ROOTDIR/' + \
-                'generation-results/' + \
-                'touchhigh_various_length_all',
+        default="ROOTDIR/"
+        + "generation-results/"
+        + "touchhigh_various_length_all",
     )
     parser.add_argument(
-        "-o", "--pdb", help="Path directory to output PDB directory", type=Path, required=True,
-        default='ROOTDIR/' + \
-                'generation-results/' + \
-                'touchhigh_various_length_all/esmfold_pdb',
+        "-o",
+        "--pdb",
+        help="Path directory to output PDB directory",
+        type=Path,
+        default=None,
     )
     parser.add_argument(
-        "-m", "--model-dir", help="Parent path to Pretrained ESM data directory. ", type=Path, default=None
+        "-m",
+        "--model-dir",
+        help="Parent path to Pretrained ESM data directory. ",
+        type=Path,
+        default=None,
     )
     parser.add_argument(
         "--num-recycles",
@@ -180,12 +189,14 @@ def create_parser():
         "Default: None.",
     )
     parser.add_argument("--cpu-only", help="CPU only", action="store_true")
-    parser.add_argument("--cpu-offload", help="Enable CPU offloading", action="store_true")
+    parser.add_argument(
+        "--cpu-offload", help="Enable CPU offloading", action="store_true"
+    )
     return parser
 
 
 def run(args):
-    args.pdb.mkdir(exist_ok=True)
+    # args.pdb.mkdir(exist_ok=True)
 
     logger.info("Loading model")
 
@@ -195,7 +206,6 @@ def run(args):
         torch.hub.set_dir(args.model_dir)
 
     model = esm.pretrained.esmfold_v1()
-
 
     model = model.eval()
     model.set_chunk_size(args.chunk_size)
@@ -208,28 +218,30 @@ def run(args):
     else:
         model.cuda()
 
-
-    fasta_list = os.listdir(args.fasta)
-    for fasta in fasta_list:
-        if os.path.isdir(os.path.join(args.fasta, fasta)):
-            continue
+    for fasta in glob.glob(f"{args.fasta_dir}/**/*.fasta"):
         print(fasta)
-        pdbdir = os.path.join(args.pdb, fasta[:-6])
+        if args.pdb is not None:
+            pdbdir = os.path.join(args.pdb, fasta[:-6])
+        else:
+            pdbdir = os.path.join(os.path.dirname(fasta), "esmfold_pdb")
         Path(pdbdir).mkdir(exist_ok=True)
         # Read fasta and sort sequences by length
         logger.info(f"Reading sequences from {fasta}")
-        fasta_path = os.path.join(args.fasta, fasta)
-        all_sequences = sorted(read_fasta(fasta_path), key=lambda header_seq: len(header_seq[1]))
+        all_sequences = sorted(
+            read_fasta(fasta), key=lambda header_seq: len(header_seq[1])
+        )
         logger.info(f"Loaded {len(all_sequences)} sequences from {fasta}")
         logger.info("Starting Predictions")
-        batched_sequences = create_batched_sequence_datasest(all_sequences, args.max_tokens_per_batch)
+        batched_sequences = create_batched_sequence_datasest(
+            all_sequences, args.max_tokens_per_batch
+        )
 
         num_completed = 0
         num_sequences = len(all_sequences)
         for headers, sequences in batched_sequences:
             start = timer()
             try:
-                #with torch.cuda.amp.autocast():
+                # with torch.cuda.amp.autocast():
                 output = model.infer(sequences, num_recycles=args.num_recycles)
             except RuntimeError as e:
                 if e.args[0].startswith("CUDA out of memory"):
@@ -251,11 +263,15 @@ def run(args):
             tottime = timer() - start
             time_string = f"{tottime / len(headers):0.1f}s"
             if len(sequences) > 1:
-                time_string = time_string + f" (amortized, batch size {len(sequences)})"
+                time_string = (
+                    time_string + f" (amortized, batch size {len(sequences)})"
+                )
             for header, seq, pdb_string, mean_plddt, ptm in zip(
                 headers, sequences, pdbs, output["mean_plddt"], output["ptm"]
             ):
-                output_file = os.path.join(pdbdir, f"{header}_plddt_{mean_plddt}.pdb")
+                output_file = os.path.join(
+                    pdbdir, f"{header}_plddt_{mean_plddt}.pdb"
+                )
                 output_file = Path(output_file)
                 output_file.write_text(pdb_string)
                 num_completed += 1
@@ -270,6 +286,7 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
     run(args)
+
 
 if __name__ == "__main__":
     main()

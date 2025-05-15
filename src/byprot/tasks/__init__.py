@@ -1,4 +1,3 @@
-
 # Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
@@ -8,7 +7,7 @@ import glob
 import importlib
 import os
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, List, Optional, Union, Mapping
+from typing import Any, Callable, Dict, List, Mapping, Optional, Union
 
 import numpy as np
 import torch
@@ -29,6 +28,7 @@ log = utils.get_logger(__name__)
 
 _METRIC_COLLECTION = Union[_METRIC, Mapping[str, _METRIC]]
 
+
 @contextmanager
 def on_prediction_mode(pl_module: LightningModule, enable=True):
     if not enable:
@@ -48,7 +48,9 @@ def on_prediction_mode(pl_module: LightningModule, enable=True):
     ]
 
     for _method in _methods:
-        _test_method, _predict_method = _method.format("test"), _method.format("predict")
+        _test_method, _predict_method = _method.format("test"), _method.format(
+            "predict"
+        )
 
         _test_method_obj = getattr(pl_module, _test_method, None)
         _predict_method_obj = getattr(pl_module, _predict_method, None)
@@ -60,7 +62,9 @@ def on_prediction_mode(pl_module: LightningModule, enable=True):
     yield
 
     for _method in _methods:
-        _test_method, _predict_method = _method.format("test"), _method.format("predict")
+        _test_method, _predict_method = _method.format("test"), _method.format(
+            "predict"
+        )
 
         _test_method_obj = getattr(pl_module, _test_method, None)
         _predict_method_obj = getattr(pl_module, _predict_method, None)
@@ -89,7 +93,9 @@ class TaskLitModule(LightningModule):
         model: List[nn.Module],
         criterion: nn.Module = None,
         optimizer: Union[Callable, torch.optim.Optimizer] = None,
-        lr_scheduler: Union[Callable, torch.optim.lr_scheduler._LRScheduler] = None,
+        lr_scheduler: Union[
+            Callable, torch.optim.lr_scheduler._LRScheduler
+        ] = None,
     ):
         super().__init__()
 
@@ -140,7 +146,9 @@ class TaskLitModule(LightningModule):
     ) -> None:
         if on_epoch and not self.training:
             self.valid_logged[name] = value
-        return super().log(name, value, prog_bar, logger, on_step, on_epoch, **kwargs)
+        return super().log(
+            name, value, prog_bar, logger, on_step, on_epoch, **kwargs
+        )
 
     # -------# Training #-------- #
     def step(self, batch):
@@ -173,14 +181,18 @@ class TaskLitModule(LightningModule):
     #     logging_info = f"Validation Info @ (Epoch {self.current_epoch}, global step {self.global_step}): {logging_info}"
     #     log.info(logging_info)
     def on_validation_epoch_end(self):
-        logging_info = ", ".join(f"{key}={val:.3f}" for key, val in self.valid_logged.items())
+        logging_info = ", ".join(
+            f"{key}={val:.3f}" for key, val in self.valid_logged.items()
+        )
         logging_info = f"Validation Info @ (Epoch {self.current_epoch}, global step {self.global_step}): {logging_info}"
         log.info(logging_info)
 
     def test_step(self, batch: Any, batch_idx: int):
         return self.validation_step(batch, batch_idx)
 
-    def test_step_end(self, *args, **kwargs) -> Optional[Union[torch.Tensor, Dict[str, Any]]]:
+    def test_step_end(
+        self, *args, **kwargs
+    ) -> Optional[Union[torch.Tensor, Dict[str, Any]]]:
         return self.validation_step_end(*args, **kwargs)
 
     # def test_epoch_end(self, outputs: List[Any]):
@@ -192,7 +204,9 @@ class TaskLitModule(LightningModule):
     def forward(self, batch):
         raise NotImplementedError
 
-    def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> Any:
+    def predict_step(
+        self, batch: Any, batch_idx: int, dataloader_idx: int = 0
+    ) -> Any:
         raise NotImplementedError
 
     def predict_epoch_end(self, results: List[Any], log_pref=None) -> None:
@@ -200,15 +214,23 @@ class TaskLitModule(LightningModule):
 
     # -------# Optimizers & Lr Schedulers #-------- #
     def configure_optimizers(self):
-        """Choose what optimizers and learning-rate schedulers to use in your optimization.
-        Normally you'd need one. But in the case of GANs or similar you might have multiple.
+        """Choose what optimizers and learning-rate schedulers to use in your
+        optimization. Normally you'd need one. But in the case of GANs or
+        similar you might have multiple.
 
         See examples here:
             https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
         """
-        optimizer = get_optimizer(self.hparams.optimizer, self.trainer.model.parameters())
-        if "lr_scheduler" in self.hparams and self.hparams.lr_scheduler is not None:
-            lr_scheduler, extra_kwargs = get_scheduler(self.hparams.lr_scheduler, optimizer)
+        optimizer = get_optimizer(
+            self.hparams.optimizer, self.trainer.model.parameters()
+        )
+        if (
+            "lr_scheduler" in self.hparams
+            and self.hparams.lr_scheduler is not None
+        ):
+            lr_scheduler, extra_kwargs = get_scheduler(
+                self.hparams.lr_scheduler, optimizer
+            )
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {"scheduler": lr_scheduler, **extra_kwargs},
@@ -217,8 +239,12 @@ class TaskLitModule(LightningModule):
 
     # -------# Others #-------- #
     def on_train_epoch_end(self) -> None:
-        if dist.is_initialized() and hasattr(self.trainer.datamodule, "train_batch_sampler"):
-            self.trainer.datamodule.train_batch_sampler.set_epoch(self.current_epoch + 1)
+        if dist.is_initialized() and hasattr(
+            self.trainer.datamodule, "train_batch_sampler"
+        ):
+            self.trainer.datamodule.train_batch_sampler.set_epoch(
+                self.current_epoch + 1
+            )
             self.trainer.datamodule.train_batch_sampler._build_batches()
 
     # def on_epoch_end(self):

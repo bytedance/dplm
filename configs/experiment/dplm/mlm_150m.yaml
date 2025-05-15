@@ -1,0 +1,77 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - /datamodule: uniref50_hf
+  - /callbacks: lm
+  - /trainer: ddp_bf16
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+# name of the run determines folder name in logs
+project: "MLM_150m"
+name: "mlm_150m"
+
+datamodule:
+  max_tokens: 6000
+  max_len: 1022
+
+model:
+  _target_: dplm_esm
+  net:
+    arch_type: esm
+    name: facebook/esm2_t30_150M_UR50D
+    dropout: 0.0
+  lora:
+    lora: false
+
+task:
+  _target_: lm/mlm
+  learning:
+    noise: random_mask # enable cmlm training with uniform random masking
+    mlm_prob: 0.15
+  criterion:
+    _target_: byprot.modules.cross_entropy.Coord2SeqCrossEntropyLoss
+    label_smoothing: 0.0
+    ignore_index: 1
+  optimizer:
+    type: adamw
+    _partial_: true
+    lr: ${train.lr}
+    betas:
+      - 0.9
+      - 0.98
+    weight_decay: 0.01 # 0.0001
+  lr_scheduler:
+    type: polynomial
+    warmup_steps: 2000
+    total_steps: ${trainer.max_steps}
+    lr: ${train.lr}
+    lr_end: 4e-5
+    warmup_init_lr: 1e-07
+    power: 1
+
+train:
+  seed: 42
+  lr: 4e-4
+  monitor: "val/loss"
+  mode: "min"
+  patience: 1000
+
+trainer:
+  min_epochs: 10
+  max_epochs: 10000
+  gradient_clip_val: 0.0
+  # val_check_interval: 10
+  num_sanity_val_steps: 1
+  reload_dataloaders_every_n_epochs: 1
+  use_distributed_sampler: false
+  max_steps: 500_000
+  accumulate_grad_batches: 1
+  check_val_every_n_epoch: null
+  val_check_interval: 1000
+  enable_progress_bar: true
+  num_nodes: 1

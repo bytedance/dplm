@@ -1,0 +1,98 @@
+# This config is highly inspired by the MultiFlow (https://github.com/jasonkyuyim/multiflow) repo.
+
+env:
+  PROJECT_ROOT: /root/research/projects/ByProt
+
+inference:
+  predict_dir: .local/inference_outputs/
+  inference_subdir: run_${now:%Y-%m-%d}_${now:%H-%M-%S}
+  # task: unconditional
+  # task: forward_folding
+  seed: 123
+  use_gpu: True
+  num_gpus: 1
+
+  metadata:
+    data_dir: ./data-bin
+    csv_path: ${.data_dir}/metadata/pdb_afdb_cameo.csv
+
+  task: inverse_folding
+  also_fold_pmpnn_seq: false # whether to also fold the generated pmpnn seq for each structure
+  write_sample_trajectories: False # whether to also save the trajectory of the generation process
+  no_self_consistency: true
+  # input_fasta_dir: /root/research/projects/ByProt/.local/DPLM_Structok_150m/inverse_folding/step50000_lr2e-4_dp0.1_bsz32_clip0.5_ptrntrue_ourvocab_lddt_mm_cluster50_split_step10499_IF_cluster
+  input_fasta_dir: /path/to/input/fasta/folder
+
+  # Directory of software, weights, and outputs.
+  pmpnn_dir: vendor/ProteinMPNN
+
+  folding:
+    seq_per_sample: 1
+    folding_model: esmf
+    own_device: False
+    pmpnn_path: ${..pmpnn_dir}
+    pt_hub_dir: null #./.cache/torch/
+    colabfold_path: path/to/colabfold-conda/bin/colabfold_batch # for AF2
+
+  struct_tokenizer:
+    exp_path: airkingbd/struct_tokenizer
+
+  samples:
+    # Number of backbone samples per sequence length.
+    samples_per_length: 20
+
+    # Batch size when sampling from the model
+    num_batch: -1
+
+    # Subset of lengths to sample. If null, sample all targets.
+    # length_subset: null
+    # length_subset: [70, 100, 200, 300]
+    length_subset: [70, 100, 200, 300]
+
+    # Minimum sequence length to sample.
+    min_length: 60
+
+    # Maximum sequence length to sample.
+    max_length: 256 # 256
+
+    # gap between lengths to sample. i.e. this script will sample all lengths
+    # in range(min_length, max_length, length_step)
+    length_step: 1
+
+  saved_ckpt_dir: ./saved_ckpts/frameflow
+  inverse_folding_ckpt_path: ./weights/last.ckpt
+
+  interpolant:
+    min_t: 1e-2
+    provide_kappa: False
+    codesign_separate_t: False
+
+    rots:
+      corrupt: True
+      sample_schedule: exp
+      exp_rate: 10
+
+    trans:
+      corrupt: True
+      pre_align: True
+      train_schedule: linear
+      sample_schedule: linear
+      sample_temp: 1.0
+      potential: null
+      potential_t_scaling: False
+      rog:
+        weight: 20.0
+        cutoff: 5.0
+    aatypes:
+      corrupt: True
+      schedule: linear
+      schedule_exp_rate: -3
+      temp: 0.1
+      noise: 20.0
+      do_purity: True
+      interpolant_type: masking
+    sampling:
+      num_timesteps: 500
+      do_sde: False
+
+    self_condition: True

@@ -1,3 +1,0 @@
-[submodule "vendor/esm"]
-	path = vendor/esm
-	url = https://github.com/facebookresearch/esm.git

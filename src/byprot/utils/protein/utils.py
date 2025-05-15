@@ -1,3 +1,14 @@
+# Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file has been modified by Xinyou Wang on May 15, 2025
+#
+# Original file was released under MIT, with the full license text
+# available at https://github.com/jasonkyuyim/multiflow/blob/main/LICENSE
+#
+# This modified file is released under the same license.
+
+
 """Utility functions for experiments."""
 
 import glob
@@ -63,8 +74,12 @@ class LengthDataset(torch.utils.data.Dataset):
         num_res, sample_id = self._all_sample_ids[idx]
         batch = {
             "sample_id": sample_id,
-            "seq_length": torch.full((sample_id.shape[0],), num_res, dtype=torch.long),
-            "seq": torch.zeros((sample_id.shape[0], num_res), dtype=torch.long),
+            "seq_length": torch.full(
+                (sample_id.shape[0],), num_res, dtype=torch.long
+            ),
+            "seq": torch.zeros(
+                (sample_id.shape[0], num_res), dtype=torch.long
+            ),
         }
         return batch
 
@@ -114,18 +129,26 @@ def run_easy_cluster(designable_dir, output_dir):
     stdout, stderr = process.communicate()
     # print(stdout, stderr)
     del stdout  # We don't actually need the stdout, we will read the number of clusters from the output files
-    rep_seq_fasta = fasta.FastaFile.read(os.path.join(output_dir, "res_rep_seq.fasta"))
+    rep_seq_fasta = fasta.FastaFile.read(
+        os.path.join(output_dir, "res_rep_seq.fasta")
+    )
     return len(rep_seq_fasta)
 
 
 def get_all_top_samples(output_dir, csv_fname="*/*/top_sample.csv"):
-    all_csv_paths = glob.glob(os.path.join(output_dir, csv_fname), recursive=True)
+    all_csv_paths = glob.glob(
+        os.path.join(output_dir, csv_fname), recursive=True
+    )
     top_sample_csv = pd.concat([pd.read_csv(x) for x in all_csv_paths])
-    top_sample_csv.to_csv(os.path.join(output_dir, "all_top_samples.csv"), index=False)
+    top_sample_csv.to_csv(
+        os.path.join(output_dir, "all_top_samples.csv"), index=False
+    )
     return top_sample_csv
 
 
-def calculate_diversity(output_dir, metrics_df, top_sample_csv, designable_csv_path):
+def calculate_diversity(
+    output_dir, metrics_df, top_sample_csv, designable_csv_path
+):
     designable_samples = top_sample_csv[top_sample_csv.designable]
     designable_dir = os.path.join(output_dir, "designable")
     os.makedirs(designable_dir, exist_ok=True)
@@ -152,8 +175,9 @@ def add_diversity_metrics(designable_dir, designable_csv, designable_csv_path):
     designable_csv.to_csv(designable_csv_path, index=False)
 
 
-def calculate_pmpnn_consistency(output_dir, designable_csv, designable_csv_path):
-    # output dir points to directory containing length_60, length_61, ... etc folders
+def calculate_pmpnn_consistency(
+    output_dir, designable_csv, designable_csv_path
+):
     sample_dirs = glob.glob(os.path.join(output_dir, "length_*/sample_*"))
     average_accs = []
     max_accs = []
@@ -185,20 +209,27 @@ def calculate_pmpnn_consistency(output_dir, designable_csv, designable_csv_path)
 
 
 def calculate_pmpnn_designability(
-    output_dir, designable_csv, designable_csv_path, all_mpnn_folds_df_path="pmpnn_results.csv"
+    output_dir,
+    designable_csv,
+    designable_csv_path,
+    all_mpnn_folds_df_path="pmpnn_results.csv",
 ):
     sample_dirs = glob.glob(os.path.join(output_dir, "length_*/sample_*"))
     try:
         single_pmpnn_results = []
         top_pmpnn_results = []
         for sample_dir in sample_dirs:
-            all_pmpnn_folds_df = pd.read_csv(os.path.join(sample_dir, all_mpnn_folds_df_path))
+            all_pmpnn_folds_df = pd.read_csv(
+                os.path.join(sample_dir, all_mpnn_folds_df_path)
+            )
             single_pmpnn_fold_df = all_pmpnn_folds_df.iloc[[0]]
             single_pmpnn_results.append(single_pmpnn_fold_df)
             min_index = all_pmpnn_folds_df["bb_rmsd"].idxmin()
             top_pmpnn_df = all_pmpnn_folds_df.loc[[min_index]]
             top_pmpnn_results.append(top_pmpnn_df)
-        single_pmpnn_results_df = pd.concat(single_pmpnn_results, ignore_index=True)
+        single_pmpnn_results_df = pd.concat(
+            single_pmpnn_results, ignore_index=True
+        )
         top_pmpnn_results_df = pd.concat(top_pmpnn_results, ignore_index=True)
         designable_csv["Single seq PMPNN Designability"] = np.mean(
             # single_pmpnn_results_df["bb_rmsd"].to_numpy() < 2.0
@@ -223,7 +254,15 @@ def get_pylogger(name=__name__) -> logging.Logger:
 
     # this ensures all logging levels get marked with the rank zero decorator
     # otherwise logs would get multiplied for each GPU process in multi-GPU setup
-    logging_levels = ("debug", "info", "warning", "error", "exception", "fatal", "critical")
+    logging_levels = (
+        "debug",
+        "info",
+        "warning",
+        "error",
+        "exception",
+        "fatal",
+        "critical",
+    )
     for level in logging_levels:
         setattr(logger, level, rank_zero_only(getattr(logger, level)))
 
@@ -316,7 +355,7 @@ def save_traj(
         b_factors=b_factors,
         no_indexing=True,
         aatype=aa_traj[-1] if aa_traj is not None else None,
-        omit_missing_residue=omit_missing_residue
+        omit_missing_residue=omit_missing_residue,
     )
     if write_trajectories:
         prot_traj_path = write_prot_to_pdb(
@@ -325,7 +364,7 @@ def save_traj(
             b_factors=b_factors,
             no_indexing=True,
             aatype=aa_traj,
-            omit_missing_residue=omit_missing_residue
+            omit_missing_residue=omit_missing_residue,
         )
         x0_traj_path = write_prot_to_pdb(
             x0_traj,
@@ -333,7 +372,7 @@ def save_traj(
             b_factors=b_factors,
             no_indexing=True,
             aatype=clean_aa_traj,
-            omit_missing_residue=omit_missing_residue
+            omit_missing_residue=omit_missing_residue,
         )
     return {
         "sample_path": sample_path,
@@ -409,14 +448,18 @@ def write_prot_to_pdb(
             + [0]
         )
     if not no_indexing:
-        save_path = file_path.replace(".pdb", "") + f"_{max_existing_idx+1}.pdb"
+        save_path = (
+            file_path.replace(".pdb", "") + f"_{max_existing_idx+1}.pdb"
+        )
     else:
         save_path = file_path
     with open(save_path, "w") as f:
         if prot_pos.ndim == 4:
             for t, pos37 in enumerate(prot_pos):
                 atom37_mask = np.sum(np.abs(pos37), axis=-1) > 1e-7
-                prot = create_full_prot(pos37, atom37_mask, aatype=aatype, b_factors=b_factors)
+                prot = create_full_prot(
+                    pos37, atom37_mask, aatype=aatype, b_factors=b_factors
+                )
                 pdb_prot = protein.to_pdb(prot, model=t + 1, add_end=False)
                 f.write(pdb_prot)
         elif prot_pos.ndim == 3:
@@ -426,7 +469,9 @@ def write_prot_to_pdb(
                 prot_pos[~atom37_mask] = np.nan
                 atom37_mask[..., :3] = True
                 atom37_mask[..., 4] = True
-            prot = create_full_prot(prot_pos, atom37_mask, aatype=aatype, b_factors=b_factors)
+            prot = create_full_prot(
+                prot_pos, atom37_mask, aatype=aatype, b_factors=b_factors
+            )
             pdb_prot = protein.to_pdb(prot, model=1, add_end=False)
             f.write(pdb_prot)
         else:
@@ -443,7 +488,9 @@ def write_prot_to_pdb(
 
 
 def calc_distogram(pos, min_bin, max_bin, num_bins):
-    dists_2d = torch.linalg.norm(pos[:, :, None, :] - pos[:, None, :, :], axis=-1)[..., None]
+    dists_2d = torch.linalg.norm(
+        pos[:, :, None, :] - pos[:, None, :, :], axis=-1
+    )[..., None]
     lower = torch.linspace(min_bin, max_bin, num_bins, device=pos.device)
     upper = torch.cat([lower[1:], lower.new_tensor([1e8])], dim=-1)
     dgram = ((dists_2d > lower) * (dists_2d < upper)).type(pos.dtype)
@@ -479,7 +526,8 @@ def get_time_embedding(timesteps, embedding_dim, max_positions=2000):
     half_dim = embedding_dim // 2
     emb = math.log(max_positions) / (half_dim - 1)
     emb = torch.exp(
-        torch.arange(half_dim, dtype=torch.float32, device=timesteps.device) * -emb
+        torch.arange(half_dim, dtype=torch.float32, device=timesteps.device)
+        * -emb
     )
     emb = timesteps.float()[:, None] * emb[None, :]
     emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=1)
@@ -493,7 +541,6 @@ def sinusoidal_encoding(v, N, D):
     """Taken from GENIE.
 
     Args:
-
     """
     # v: [*]
 
@@ -502,12 +549,16 @@ def sinusoidal_encoding(v, N, D):
 
     # [*, D]
     sin_div_term = N ** (2 * k / D)
-    sin_div_term = sin_div_term.view(*((1,) * len(v.shape) + (len(sin_div_term),)))
+    sin_div_term = sin_div_term.view(
+        *((1,) * len(v.shape) + (len(sin_div_term),))
+    )
     sin_enc = torch.sin(v.unsqueeze(-1) * math.pi / sin_div_term)
 
     # [*, D]
     cos_div_term = N ** (2 * (k - 1) / D)
-    cos_div_term = cos_div_term.view(*((1,) * len(v.shape) + (len(cos_div_term),)))
+    cos_div_term = cos_div_term.view(
+        *((1,) * len(v.shape) + (len(cos_div_term),))
+    )
     cos_enc = torch.cos(v.unsqueeze(-1) * math.pi / cos_div_term)
 
     # [*, D]
@@ -596,20 +647,25 @@ def process_folded_outputs(sample_path, folded_output, true_bb_pos=None):
     sample_bb_pos = sample_feats["atom_positions"][:, :3].reshape(-1, 3)
 
     def _calc_ca_rmsd(mask, sample_ca_pos, folded_ca_pos):
-        if '7W2P' not in sample_path:
+        if "7W2P" not in sample_path:
             rmsd = superimpose(
-            torch.tensor(sample_ca_pos)[None], torch.tensor(folded_ca_pos[None]), mask
-        )[1].item()
+                torch.tensor(sample_ca_pos)[None],
+                torch.tensor(folded_ca_pos[None]),
+                mask,
+            )[1].item()
         else:
             print("There is a superimpose error!")
             rmsd = 100.0
         return rmsd
 
     def _calc_bb_rmsd(mask, sample_bb_pos, folded_bb_pos):
-        if '7W2P' not in sample_path and "2o0a_A" not in sample_path \
-            and "4bg7_A" not in sample_path \
-            and "4l8o_A" not in sample_path \
-            and "5k29_A" not in sample_path:
+        if (
+            "7W2P" not in sample_path
+            and "2o0a_A" not in sample_path
+            and "4bg7_A" not in sample_path
+            and "4l8o_A" not in sample_path
+            and "5k29_A" not in sample_path
+        ):
             rmsd = superimpose(
                 torch.tensor(sample_bb_pos)[None],
                 torch.tensor(folded_bb_pos)[None],
@@ -621,10 +677,13 @@ def process_folded_outputs(sample_path, folded_output, true_bb_pos=None):
         return rmsd
 
     def _calc_bb_tmscore(mask, sample_bb_pos, folded_bb_pos, sample_seq):
-        if '7W2P' not in sample_path and "2o0a_A" not in sample_path \
-            and "4bg7_A" not in sample_path \
-            and "4l8o_A" not in sample_path \
-            and "5k29_A" not in sample_path:
+        if (
+            "7W2P" not in sample_path
+            and "2o0a_A" not in sample_path
+            and "4bg7_A" not in sample_path
+            and "4l8o_A" not in sample_path
+            and "5k29_A" not in sample_path
+        ):
             bb_mask = mask[:, None].repeat(1, 3).bool()
             _sample_seq = "A" * mask.long().sum().item()
             _, tmscore = calc_tm_score(
@@ -669,14 +728,20 @@ def process_folded_outputs(sample_path, folded_output, true_bb_pos=None):
             )
             mpnn_results["bb_tmscore_to_gt"].append(bb_tmscore_to_gt)
 
-            fold_model_bb_rmsd_to_gt = _calc_bb_rmsd(res_mask, folded_bb_pos, true_bb_pos)
-            mpnn_results["fold_model_bb_rmsd_to_gt"].append(fold_model_bb_rmsd_to_gt)
+            fold_model_bb_rmsd_to_gt = _calc_bb_rmsd(
+                res_mask, folded_bb_pos, true_bb_pos
+            )
+            mpnn_results["fold_model_bb_rmsd_to_gt"].append(
+                fold_model_bb_rmsd_to_gt
+            )
 
             # fold_model_bb_tmscore_to_gt = _calc_bb_tmscore(res_mask, folded_bb_pos, true_bb_pos, seq)
             # mpnn_results["fold_model_bb_tmscore_to_gt"].append(fold_model_bb_tmscore_to_gt)
         bb_rmsd = _calc_bb_rmsd(res_mask, sample_bb_pos, folded_bb_pos)
         ca_rmsd = _calc_ca_rmsd(res_mask, sample_ca_pos, folded_ca_pos)
-        bb_tmscore = _calc_bb_tmscore(res_mask, sample_bb_pos, folded_bb_pos, seq)
+        bb_tmscore = _calc_bb_tmscore(
+            res_mask, sample_bb_pos, folded_bb_pos, seq
+        )
         mpnn_results["bb_rmsd"].append(bb_rmsd)
         mpnn_results["ca_rmsd"].append(ca_rmsd)
         mpnn_results["bb_tmscore"].append(bb_tmscore)
@@ -756,13 +821,17 @@ def calc_mdtraj_metrics(pdb_path):
 
 def calc_aatype_metrics(generated_aatypes):
     # generated_aatypes (B, N)
-    unique_aatypes, raw_counts = np.unique(generated_aatypes, return_counts=True)
+    unique_aatypes, raw_counts = np.unique(
+        generated_aatypes, return_counts=True
+    )
 
     # pad with 0's in case it didn't generate any of a certain type
     clean_counts = []
     for i in range(20):
         if i in unique_aatypes:
-            clean_counts.append(raw_counts[np.where(unique_aatypes == i)[0][0]])
+            clean_counts.append(
+                raw_counts[np.where(unique_aatypes == i)[0][0]]
+            )
         else:
             clean_counts.append(0)
 
@@ -798,18 +867,27 @@ def calc_aatype_metrics(generated_aatypes):
     # and the reference normalized counts
 
     hellinger_distance = np.sqrt(
-        np.sum(np.square(np.sqrt(normalized_counts) - np.sqrt(reference_normalized_counts)))
+        np.sum(
+            np.square(
+                np.sqrt(normalized_counts)
+                - np.sqrt(reference_normalized_counts)
+            )
+        )
     )
 
     return {"aatype_histogram_dist": hellinger_distance}
 
 
 def calc_ca_ca_metrics(ca_pos, bond_tol=0.1, clash_tol=1.0):
-    ca_bond_dists = np.linalg.norm(ca_pos - np.roll(ca_pos, 1, axis=0), axis=-1)[1:]
+    ca_bond_dists = np.linalg.norm(
+        ca_pos - np.roll(ca_pos, 1, axis=0), axis=-1
+    )[1:]
     ca_ca_dev = np.mean(np.abs(ca_bond_dists - residue_constants.ca_ca))
     ca_ca_valid = np.mean(ca_bond_dists < (residue_constants.ca_ca + bond_tol))
 
-    ca_ca_dists2d = np.linalg.norm(ca_pos[:, None, :] - ca_pos[None, :, :], axis=-1)
+    ca_ca_dists2d = np.linalg.norm(
+        ca_pos[:, None, :] - ca_pos[None, :, :], axis=-1
+    )
     inter_dists = ca_ca_dists2d[np.where(np.triu(ca_ca_dists2d, k=0) > 0)]
     clashes = inter_dists < clash_tol
     return {

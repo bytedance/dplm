@@ -1,6 +1,16 @@
-"""
-This script is highly inspired by MultiFlow.
-"""
+# Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file has been modified by Xinyou Wang on May 15, 2025
+#
+# Original file was released under MIT, with the full license text
+# available at https://github.com/jasonkyuyim/multiflow/blob/main/LICENSE
+#
+# This modified file is released under the same license.
+
+
+"""This script is highly inspired by MultiFlow
+(https://github.com/jasonkyuyim/multiflow)."""
 
 import os
 import re
@@ -18,18 +28,20 @@ import torch.distributed as dist
 import torch.utils
 import tree
 from biotite.sequence.io import fasta
-
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import Trainer
 from tqdm.auto import tqdm
 
 from byprot.datamodules.pdb_dataset import protein as protein_utils
 from byprot.datamodules.pdb_dataset import utils as du
-from byprot.datamodules.pdb_dataset.pdb_datamodule import PdbDataset, collate_fn
+from byprot.datamodules.pdb_dataset.pdb_datamodule import (
+    PdbDataset,
+    collate_fn,
+)
+from byprot.models.utils import get_struct_tokenizer
 from byprot.utils import load_from_experiment, recursive_to, seed_everything
 from byprot.utils.protein import folding_model
 from byprot.utils.protein import utils as eu
-from byprot.models.utils import get_struct_tokenizer
 from byprot.utils.protein.residue_constants import restypes, restypes_with_x
 
 warnings.filterwarnings("ignore")
@@ -56,7 +68,6 @@ def load_pdb_by_name(pdb_name, metadata_df):
 
 
 class EvalRunner:
-
     def __init__(self, cfg: DictConfig):
         """Initialize sampler.
 
@@ -71,7 +82,10 @@ class EvalRunner:
             ckpt_path = cfg.inference.input_fasta_dir
         elif cfg.inference.task == "inverse_folding":
             ckpt_path = cfg.inference.input_fasta_dir
-        elif cfg.inference.task == "reconstruction" or cfg.inference.task == "reconstruction_continuous":
+        elif (
+            cfg.inference.task == "reconstruction"
+            or cfg.inference.task == "reconstruction_continuous"
+        ):
             ckpt_path = cfg.inference.input_pdb_folder
         else:
             raise ValueError(f"Unknown task {cfg.inference.task}")
@@ -110,7 +124,9 @@ class EvalRunner:
             df = pd.read_csv(cfg.csv_path)
             for column in ["processed_path", "raw_path", "pdb_path"]:
                 if column in df:
-                    df[column] = df[column].map(lambda x: os.path.join(cfg.data_dir, x))
+                    df[column] = df[column].map(
+                        lambda x: os.path.join(cfg.data_dir, x)
+                    )
             return df
         else:
             print(f"Metadata file not found in the {cfg.csv_path}")
@@ -139,12 +155,10 @@ class EvalRunner:
     @property
     def struct_tokenizer(self):
         if self._struct_tokenizer is None:
-            print(
-                f"Loading struct_tokenizer..."
-            )
-            self._struct_tokenizer = get_struct_tokenizer(self._infer_cfg.struct_tokenizer.exp_path).to(
-                self.device
-            )
+            print(f"Loading struct_tokenizer...")
+            self._struct_tokenizer = get_struct_tokenizer(
+                self._infer_cfg.struct_tokenizer.exp_path
+            ).to(self.device)
 
         return self._struct_tokenizer
 
@@ -164,7 +178,9 @@ class EvalRunner:
         return self._inference_dir
 
     def setup_inference_dir(self, ckpt_path):
-        self._ckpt_name = "/".join(ckpt_path.replace(".ckpt", "").split("/")[-3:])
+        self._ckpt_name = "/".join(
+            ckpt_path.replace(".ckpt", "").split("/")[-3:]
+        )
         output_dir = os.path.join(
             ckpt_path,
             self._infer_cfg.task,
@@ -188,7 +204,9 @@ class EvalRunner:
             feats["structok"] = torch.LongTensor(
                 np.array(self.struct_tokenizer.struct_seq_to_ids(struct_seq))
             )
-            feats["res_mask"] = torch.ones_like(feats["structok"], dtype=torch.float)
+            feats["res_mask"] = torch.ones_like(
+                feats["structok"], dtype=torch.float
+            )
             return feats
 
         all_data = []
@@ -198,7 +216,8 @@ class EvalRunner:
                 pdb_name = header
             elif self._infer_cfg.task != "unconditional":
                 header = pdb_name = header[
-                    header.find("PDB_name_") + len("PDB_name_") : header.find("_L=")
+                    header.find("PDB_name_")
+                    + len("PDB_name_") : header.find("_L=")
                 ]
                 feats["aatype"] = torch.ones_like(feats["structok"])
 
@@ -207,7 +226,9 @@ class EvalRunner:
         log.info(f"Loaded {len(all_data)} struct_seq from {fasta_path}")
 
         fasta_name = os.path.basename(fasta_path).replace(".fasta", "")
-        output_dir = os.path.join(self.inference_dir, fasta_name, "struct_pred")
+        output_dir = os.path.join(
+            self.inference_dir, fasta_name, "struct_pred"
+        )
         os.makedirs(output_dir, exist_ok=True)
         log.info(f"Predicting strctures from {fasta_path}")
 
@@ -243,7 +264,9 @@ class EvalRunner:
         natsort = lambda s: [
             int(t) if t.isdigit() else t.lower() for t in re.split("(\d+)", s)
         ]
-        pdb_paths = sorted(list(glob(os.path.join(pdb_folder, "*.pdb"))), key=natsort)
+        pdb_paths = sorted(
+            list(glob(os.path.join(pdb_folder, "*.pdb"))), key=natsort
+        )
 
         saveto = os.path.join(pdb_folder, "_traj.pdb")
         f = open(saveto, "w")
@@ -252,7 +275,9 @@ class EvalRunner:
             os.remove(pdb_path)
 
             pdb_path = os.path.basename(pdb_path)
-            t = int(pdb_path[pdb_path.index("t_") + 2 : pdb_path.index(".pdb")])
+            t = int(
+                pdb_path[pdb_path.index("t_") + 2 : pdb_path.index(".pdb")]
+            )
 
             prot = protein_utils.from_pdb_string(pdb_string)
             pdb_prot = protein_utils.to_pdb(prot, model=t + 1, add_end=False)
@@ -262,9 +287,13 @@ class EvalRunner:
     @torch.no_grad()
     def _run_struct_tokenizer(self, batch, output_dir, is_trajectory=False):
         batch = recursive_to(batch, device=self.device)
-        decoder_out = self.struct_tokenizer.detokenize(batch['structok'], batch['res_mask'])
+        decoder_out = self.struct_tokenizer.detokenize(
+            batch["structok"], batch["res_mask"]
+        )
 
-        save_with_aatype = self.aatype_corrupt or self._infer_cfg.task == "forward_folding"
+        save_with_aatype = (
+            self.aatype_corrupt or self._infer_cfg.task == "forward_folding"
+        )
         if save_with_aatype:
             decoder_out["aatype"] = batch["aatype"]
         decoder_out["header"] = batch["header"]
@@ -283,7 +312,9 @@ class EvalRunner:
             log.info(f"Processing {pdb_path}")
 
             # predicted structures
-            feats = load_from_pdb(pdb_path, process_chain=self.struct_tokenizer.process_chain)
+            feats = load_from_pdb(
+                pdb_path, process_chain=self.struct_tokenizer.process_chain
+            )
             feats["pdb_path"] = pdb_path
             feats["header"] = feats["pdb_name"]
 
@@ -302,27 +333,39 @@ class EvalRunner:
         pbar = tqdm(dataloader)
         for batch in pbar:
             pdb_name = batch["pdb_name"][0]
-            pbar.set_description(f"Tokenize: {pdb_name} (L={batch['seq_length'][0]})")
+            pbar.set_description(
+                f"Tokenize: {pdb_name} (L={batch['seq_length'][0]})"
+            )
             batch = recursive_to(batch, device=self.device)
 
-            struct_ids = self.struct_tokenizer.tokenize(batch['all_atom_positions'], batch['res_mask'], batch['seq_length'])
-            struct_seq = self.struct_tokenizer.struct_ids_to_seq(struct_ids.cpu().tolist()[0])
+            struct_ids = self.struct_tokenizer.tokenize(
+                batch["all_atom_positions"],
+                batch["res_mask"],
+                batch["seq_length"],
+            )
+            struct_seq = self.struct_tokenizer.struct_ids_to_seq(
+                struct_ids.cpu().tolist()[0]
+            )
             all_header_struct_seq.append((pdb_name, struct_seq))
 
             aa_seq = du.aatype_to_seq(batch["aatype"].cpu().tolist()[0])
             all_header_aa_seq.append((pdb_name, aa_seq))
 
         output_struct_fasta_path = os.path.join(output_dir, "struct_seq.fasta")
-        fasta.FastaFile.write_iter(output_struct_fasta_path, all_header_struct_seq)
+        fasta.FastaFile.write_iter(
+            output_struct_fasta_path, all_header_struct_seq
+        )
 
         output_aa_fasta_path = os.path.join(output_dir, "aa_seq.fasta")
         fasta.FastaFile.write_iter(output_aa_fasta_path, all_header_aa_seq)
 
         return output_struct_fasta_path, all_data
-    
+
     def evaluate_reconstruction(self, pdb_folder, inplace_save=False):
         # 1. run tokenization
-        pred_fasta_path, all_feats_gt = self.run_tokenize(pdb_folder, self.inference_dir)
+        pred_fasta_path, all_feats_gt = self.run_tokenize(
+            pdb_folder, self.inference_dir
+        )
 
         # 2. run detokenization
         pred_pdb_folder = self.run_detokenize_from_fasta(pred_fasta_path)
@@ -338,7 +381,10 @@ class EvalRunner:
 
             # load pred structure
             pred_pdb_path = os.path.join(pred_pdb_folder, pdb_name + ".pdb")
-            feats = load_from_pdb(pred_pdb_path, process_chain=self.struct_tokenizer.process_chain)
+            feats = load_from_pdb(
+                pred_pdb_path,
+                process_chain=self.struct_tokenizer.process_chain,
+            )
             feats["pdb_path"] = pdb_path
             feats["header"] = pdb_name
 
@@ -392,7 +438,9 @@ class EvalRunner:
 
         pbar = tqdm(dataloader)
         for batch in pbar:
-            pbar.set_description(f"{batch['pdb_name'][0]} (L={batch['seq_length'][0]})")
+            pbar.set_description(
+                f"{batch['pdb_name'][0]} (L={batch['seq_length'][0]})"
+            )
             self.run_evaluation(batch, eval_dir)
 
         return eval_dir
@@ -431,7 +479,9 @@ class EvalRunner:
         )
         pbar = tqdm(dataloader)
         for batch in pbar:
-            pbar.set_description(f"{batch['pdb_name'][0]} (L={batch['seq_length'][0]})")
+            pbar.set_description(
+                f"{batch['pdb_name'][0]} (L={batch['seq_length'][0]})"
+            )
             self.run_evaluation(batch, eval_dir)
 
         return eval_dir
@@ -460,11 +510,15 @@ class EvalRunner:
             feats = load_pdb_by_name(pdb_name, self.metadata)
             feats["pdb_name"] = pdb_name
             feats["header"] = pdb_name
-            feats["all_atom_positions_gt"] = deepcopy(feats["all_atom_positions"])
+            feats["all_atom_positions_gt"] = deepcopy(
+                feats["all_atom_positions"]
+            )
             # feats["all_atom_mask_gt"] = deepcopy(feats["all_atom_mask"])
             feats["aatype_gt"] = deepcopy(feats["aatype"])
             # predicted amino acid sequence
-            feats["aatype"] = torch.LongTensor(np.array(du.seq_to_aatype(aa_seq)))
+            feats["aatype"] = torch.LongTensor(
+                np.array(du.seq_to_aatype(aa_seq))
+            )
 
             saveto = os.path.join(output_dir, f"{pdb_name}.pdb")
             log.info(f"Saving {pdb_name} to {saveto}")
@@ -491,9 +545,11 @@ class EvalRunner:
         for batch in pbar:
             # if batch['pdb_name'][0] != '7fh0_B':
             #     continue
-            pbar.set_description(f"{batch['pdb_name'][0]} (L={batch['seq_length'][0]})")
+            pbar.set_description(
+                f"{batch['pdb_name'][0]} (L={batch['seq_length'][0]})"
+            )
             self.run_evaluation(batch, eval_dir)
-        
+
         return eval_dir
 
     def run_evaluation(self, batch, eval_dir):
@@ -501,7 +557,9 @@ class EvalRunner:
             sample_ids = batch["sample_id"].squeeze().tolist()
         else:
             sample_ids = list(range(batch["aatype"].shape[0]))
-        sample_ids = [sample_ids] if isinstance(sample_ids, int) else sample_ids
+        sample_ids = (
+            [sample_ids] if isinstance(sample_ids, int) else sample_ids
+        )
         sample_lengths = batch["seq_length"].reshape(-1).tolist()
         num_batch = len(sample_ids)
 
@@ -539,14 +597,21 @@ class EvalRunner:
                 # save the ground truth as a pdb
                 eu.write_prot_to_pdb(
                     prot_pos=true_bb_pos[i].cpu().detach().numpy(),
-                    file_path=os.path.join(sample_dirs[i], batch["pdb_name"][i] + "_gt.pdb"),
+                    file_path=os.path.join(
+                        sample_dirs[i], batch["pdb_name"][i] + "_gt.pdb"
+                    ),
                     aatype=batch["aatype_gt"][i].cpu().detach().numpy(),
                     no_indexing=True,
                     omit_missing_residue=False,
                 )
                 eu.write_prot_to_pdb(
-                    prot_pos=batch["all_atom_positions"][i].cpu().detach().numpy(),
-                    file_path=os.path.join(sample_dirs[i], batch["pdb_name"][i] + ".pdb"),
+                    prot_pos=batch["all_atom_positions"][i]
+                    .cpu()
+                    .detach()
+                    .numpy(),
+                    file_path=os.path.join(
+                        sample_dirs[i], batch["pdb_name"][i] + ".pdb"
+                    ),
                     aatype=batch["aatype_gt"][i].cpu().detach().numpy(),
                     no_indexing=True,
                     omit_missing_residue=False,
@@ -576,14 +641,21 @@ class EvalRunner:
                 # save the ground truth as a pdb
                 eu.write_prot_to_pdb(
                     prot_pos=true_bb_pos[i].cpu().detach().numpy(),
-                    file_path=os.path.join(sample_dirs[i], batch["pdb_name"][i] + "_gt.pdb"),
+                    file_path=os.path.join(
+                        sample_dirs[i], batch["pdb_name"][i] + "_gt.pdb"
+                    ),
                     aatype=batch["aatype_gt"][i].cpu().detach().numpy(),
                     no_indexing=True,
                     omit_missing_residue=False,
                 )
                 eu.write_prot_to_pdb(
-                    prot_pos=batch["all_atom_positions"][i].cpu().detach().numpy(),
-                    file_path=os.path.join(sample_dirs[i], batch["pdb_name"][i] + ".pdb"),
+                    prot_pos=batch["all_atom_positions"][i]
+                    .cpu()
+                    .detach()
+                    .numpy(),
+                    file_path=os.path.join(
+                        sample_dirs[i], batch["pdb_name"][i] + ".pdb"
+                    ),
                     aatype=batch["aatype_gt"][i].cpu().detach().numpy(),
                     no_indexing=True,
                     omit_missing_residue=False,
@@ -613,13 +685,17 @@ class EvalRunner:
                 # save the ground truth as a pdb
                 eu.write_prot_to_pdb(
                     prot_pos=true_bb_pos[i].cpu().detach().numpy(),
-                    file_path=os.path.join(sample_dirs[i], batch["pdb_name"][i] + "_gt.pdb"),
+                    file_path=os.path.join(
+                        sample_dirs[i], batch["pdb_name"][i] + "_gt.pdb"
+                    ),
                     aatype=batch["aatype_gt"][i].cpu().detach().numpy(),
                 )
                 # save predicted sequence with gt backbone as a pdb
                 eu.write_prot_to_pdb(
                     prot_pos=true_bb_pos[i].cpu().detach().numpy(),
-                    file_path=os.path.join(sample_dirs[i], batch["pdb_name"][i] + ".pdb"),
+                    file_path=os.path.join(
+                        sample_dirs[i], batch["pdb_name"][i] + ".pdb"
+                    ),
                     aatype=batch["aatype"][i].cpu().detach().numpy(),
                 )
             true_bb_pos = true_bb_pos[..., :3, :].reshape(-1, 3).cpu().numpy()
@@ -632,7 +708,8 @@ class EvalRunner:
 
         # Skip runs if already exist
         top_sample_csv_paths = [
-            os.path.join(sample_dir, "top_sample.csv") for sample_dir in sample_dirs
+            os.path.join(sample_dir, "top_sample.csv")
+            for sample_dir in sample_dirs
         ]
         if all(
             [
@@ -647,7 +724,9 @@ class EvalRunner:
         model_traj = deepcopy(prot_traj)
 
         diffuse_mask = (
-            diffuse_mask if diffuse_mask is not None else torch.ones(1, sample_length)
+            diffuse_mask
+            if diffuse_mask is not None
+            else torch.ones(1, sample_length)
         )
 
         # backbone trajectories
@@ -656,17 +735,33 @@ class EvalRunner:
 
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
         noisy_traj_length = bb_trajs.shape[1]
-        assert bb_trajs.shape == (num_batch, noisy_traj_length, sample_length, 37, 3)
+        assert bb_trajs.shape == (
+            num_batch,
+            noisy_traj_length,
+            sample_length,
+            37,
+            3,
+        )
 
-        model_trajs = du.to_numpy(torch.stack(atom37_model_traj, dim=0).transpose(0, 1))
+        model_trajs = du.to_numpy(
+            torch.stack(atom37_model_traj, dim=0).transpose(0, 1)
+        )
         clean_traj_length = model_trajs.shape[1]
-        assert model_trajs.shape == (num_batch, clean_traj_length, sample_length, 37, 3)
+        assert model_trajs.shape == (
+            num_batch,
+            clean_traj_length,
+            sample_length,
+            37,
+            3,
+        )
 
         # aa trajectories
         aa_traj = [x[1] for x in prot_traj]
         clean_aa_traj = [x[1] for x in model_traj]
 
-        aa_trajs = du.to_numpy(torch.stack(aa_traj, dim=0).transpose(0, 1).long())
+        aa_trajs = du.to_numpy(
+            torch.stack(aa_traj, dim=0).transpose(0, 1).long()
+        )
         assert aa_trajs.shape == (num_batch, noisy_traj_length, sample_length)
 
         for i in range(aa_trajs.shape[0]):
@@ -674,11 +769,19 @@ class EvalRunner:
                 if aa_trajs[i, -1, j] == du.MASK_TOKEN_INDEX:
                     print("WARNING mask in predicted AA")
                     aa_trajs[i, -1, j] = 0
-        clean_aa_trajs = du.to_numpy(torch.stack(clean_aa_traj, dim=0).transpose(0, 1).long())
-        assert clean_aa_trajs.shape == (num_batch, clean_traj_length, sample_length)
+        clean_aa_trajs = du.to_numpy(
+            torch.stack(clean_aa_traj, dim=0).transpose(0, 1).long()
+        )
+        assert clean_aa_trajs.shape == (
+            num_batch,
+            clean_traj_length,
+            sample_length,
+        )
 
         for i, sample_id in tqdm(
-            zip(range(num_batch), sample_ids), total=num_batch, desc=f"{sample_length}"
+            zip(range(num_batch), sample_ids),
+            total=num_batch,
+            desc=f"{sample_length}",
         ):
             sample_dir = sample_dirs[i]
             top_sample_df = self.compute_sample_metrics(
@@ -710,11 +813,15 @@ class EvalRunner:
             pdb_input_path,
         )
         mpnn_fasta_path = os.path.join(
-            write_dir, "seqs", os.path.basename(pdb_input_path).replace(".pdb", ".fa")
+            write_dir,
+            "seqs",
+            os.path.basename(pdb_input_path).replace(".pdb", ".fa"),
         )
         fasta_seqs = fasta.FastaFile.read(mpnn_fasta_path)
         all_header_seqs = [
-            (f"pmpnn_seq_{i}", seq) for i, (_, seq) in enumerate(fasta_seqs.items()) if i > 0
+            (f"pmpnn_seq_{i}", seq)
+            for i, (_, seq) in enumerate(fasta_seqs.items())
+            if i > 0
         ]
         modified_fasta_path = mpnn_fasta_path.replace(".fa", "_modified.fasta")
         fasta.FastaFile.write_iter(modified_fasta_path, all_header_seqs)
@@ -764,7 +871,9 @@ class EvalRunner:
         # Run PMPNN to get sequences
         sc_output_dir = os.path.join(sample_dir, "self_consistency")
         os.makedirs(sc_output_dir, exist_ok=True)
-        pmpnn_pdb_path = os.path.join(sc_output_dir, os.path.basename(pdb_path))
+        pmpnn_pdb_path = os.path.join(
+            sc_output_dir, os.path.basename(pdb_path)
+        )
         shutil.copy(pdb_path, pmpnn_pdb_path)
         assert (diffuse_mask == 1.0).all()
         if not self._infer_cfg.no_self_consistency:
@@ -775,10 +884,16 @@ class EvalRunner:
         else:
             pmpnn_fasta_path = None
 
-        os.makedirs(os.path.join(sc_output_dir, "codesign_seqs"), exist_ok=True)
+        os.makedirs(
+            os.path.join(sc_output_dir, "codesign_seqs"), exist_ok=True
+        )
         codesign_fasta = fasta.FastaFile()
-        codesign_fasta["codesign_seq_1"] = "".join([restypes[x] for x in aa_traj[-1]])
-        codesign_fasta_path = os.path.join(sc_output_dir, "codesign_seqs", "codesign.fa")
+        codesign_fasta["codesign_seq_1"] = "".join(
+            [restypes[x] for x in aa_traj[-1]]
+        )
+        codesign_fasta_path = os.path.join(
+            sc_output_dir, "codesign_seqs", "codesign.fa"
+        )
         codesign_fasta.write(codesign_fasta_path)
 
         folded_dir = os.path.join(sc_output_dir, "folded")
@@ -787,8 +902,12 @@ class EvalRunner:
         os.makedirs(folded_dir, exist_ok=False)
         if aatypes_corrupt:
             # codesign metrics
-            folded_output = self.folding_model.fold_fasta(codesign_fasta_path, folded_dir)
-            mpnn_results = eu.process_folded_outputs(pdb_path, folded_output, true_bb_pos)
+            folded_output = self.folding_model.fold_fasta(
+                codesign_fasta_path, folded_dir
+            )
+            mpnn_results = eu.process_folded_outputs(
+                pdb_path, folded_output, true_bb_pos
+            )
 
             if also_fold_pmpnn_seq:
                 pmpnn_folded_output = self.folding_model.fold_fasta(
@@ -797,15 +916,23 @@ class EvalRunner:
                 pmpnn_results = eu.process_folded_outputs(
                     pdb_path, pmpnn_folded_output, true_bb_pos
                 )
-                pmpnn_results.to_csv(os.path.join(sample_dir, "pmpnn_results.csv"))
+                pmpnn_results.to_csv(
+                    os.path.join(sample_dir, "pmpnn_results.csv")
+                )
 
         else:
             # non-codesign metrics (unconditional, inverse folding)
             if pmpnn_fasta_path is not None:
-                folded_output = self.folding_model.fold_fasta(pmpnn_fasta_path, folded_dir)
+                folded_output = self.folding_model.fold_fasta(
+                    pmpnn_fasta_path, folded_dir
+                )
             else:
-                folded_output = None  # do not perform self-consistency evaluation
-            mpnn_results = eu.process_folded_outputs(pdb_path, folded_output, true_bb_pos)
+                folded_output = (
+                    None  # do not perform self-consistency evaluation
+                )
+            mpnn_results = eu.process_folded_outputs(
+                pdb_path, folded_output, true_bb_pos
+            )
 
         # mpnn_results = eu.process_folded_outputs(pdb_path, folded_output, true_bb_pos)
 
@@ -813,15 +940,22 @@ class EvalRunner:
             assert true_aa.shape == (1, sample_length)
 
             true_aa_fasta = fasta.FastaFile()
-            true_aa_fasta["seq_1"] = "".join([restypes_with_x[i] for i in true_aa[0]])
+            true_aa_fasta["seq_1"] = "".join(
+                [restypes_with_x[i] for i in true_aa[0]]
+            )
             true_aa_fasta.write(os.path.join(sample_dir, "true_aa.fa"))
 
             sample_aa_fasta = fasta.FastaFile()
-            sample_aa_fasta["seq_1"] = "".join([restypes_with_x[i] for i in aa_traj[-1]])
+            sample_aa_fasta["seq_1"] = "".join(
+                [restypes_with_x[i] for i in aa_traj[-1]]
+            )
             sample_aa_fasta.write(os.path.join(sample_dir, "sample_aa.fa"))
 
             seq_recovery = (
-                (torch.from_numpy(aa_traj[-1]).to(true_aa[0].device) == true_aa[0])
+                (
+                    torch.from_numpy(aa_traj[-1]).to(true_aa[0].device)
+                    == true_aa[0]
+                )
                 .float()
                 .mean()
             )
@@ -834,9 +968,13 @@ class EvalRunner:
                 pmpnn_fasta_idx = torch.tensor(
                     [restypes_with_x.index(x) for x in pmpnn_fasta_str]
                 ).to(true_aa[0].device)
-                pmpnn_seq_recovery = (pmpnn_fasta_idx == true_aa[0]).float().mean()
+                pmpnn_seq_recovery = (
+                    (pmpnn_fasta_idx == true_aa[0]).float().mean()
+                )
                 pmpnn_results["pmpnn_seq_recovery"] = pmpnn_seq_recovery.item()
-                pmpnn_results.to_csv(os.path.join(sample_dir, "pmpnn_results.csv"))
+                pmpnn_results.to_csv(
+                    os.path.join(sample_dir, "pmpnn_results.csv")
+                )
                 mpnn_results["pmpnn_seq_recovery"] = pmpnn_seq_recovery.item()
                 mpnn_results["pmpnn_bb_rmsd"] = pmpnn_results["bb_rmsd"]
             else:
@@ -852,13 +990,21 @@ class EvalRunner:
 
         # Select the top sample
         if self._infer_cfg.task.startswith("unconditional"):
-            top_sample = mpnn_results.sort_values("bb_tmscore", ascending=False).iloc[:1]
+            top_sample = mpnn_results.sort_values(
+                "bb_tmscore", ascending=False
+            ).iloc[:1]
         elif self._infer_cfg.task.startswith("reconstruction"):
-            top_sample = mpnn_results.sort_values("bb_tmscore_to_gt", ascending=False).iloc[:1]
+            top_sample = mpnn_results.sort_values(
+                "bb_tmscore_to_gt", ascending=False
+            ).iloc[:1]
         elif self._infer_cfg.task == "forward_folding":
-            top_sample = mpnn_results.sort_values("bb_tmscore_to_gt", ascending=False).iloc[:1]
+            top_sample = mpnn_results.sort_values(
+                "bb_tmscore_to_gt", ascending=False
+            ).iloc[:1]
         elif self._infer_cfg.task == "inverse_folding":
-            top_sample = mpnn_results.sort_values("bb_rmsd", ascending=True).iloc[:1]
+            top_sample = mpnn_results.sort_values(
+                "bb_rmsd", ascending=True
+            ).iloc[:1]
 
         # Compute secondary structure metrics
         sample_dict = top_sample.iloc[0].to_dict()
@@ -883,11 +1029,17 @@ class EvalRunner:
         designable_csv_path = os.path.join(output_dir, "designable.csv")
         metrics_df.to_csv(designable_csv_path, index=False)
         if self._infer_cfg.calculate_diversity:
-            eu.calculate_diversity(output_dir, metrics_df, top_sample_csv, designable_csv_path)
+            eu.calculate_diversity(
+                output_dir, metrics_df, top_sample_csv, designable_csv_path
+            )
         if self.aatype_corrupt and self._infer_cfg.also_fold_pmpnn_seq:
             # co-design metrics
-            eu.calculate_pmpnn_consistency(output_dir, metrics_df, designable_csv_path)
-            eu.calculate_pmpnn_designability(output_dir, metrics_df, designable_csv_path)
+            eu.calculate_pmpnn_consistency(
+                output_dir, metrics_df, designable_csv_path
+            )
+            eu.calculate_pmpnn_designability(
+                output_dir, metrics_df, designable_csv_path
+            )
         # elif self._infer_cfg.also_fold_pmpnn_seq:
         #     eu.calculate_pmpnn_designability(
         #         output_dir,
@@ -900,7 +1052,9 @@ class EvalRunner:
         log.info(f"Calculating metrics for {output_dir}")
         top_sample_csv = eu.get_all_top_samples(output_dir)
         # top_sample_csv["fold_match_seq"] = top_sample_csv.bb_rmsd_to_gt <= 2.0
-        top_sample_csv["fold_match_seq"] = top_sample_csv.bb_tmscore_to_gt >= 0.8
+        top_sample_csv["fold_match_seq"] = (
+            top_sample_csv.bb_tmscore_to_gt >= 0.8
+        )
         metrics_df = pd.DataFrame(
             data={
                 "Total Match Seq": top_sample_csv.fold_match_seq.sum(),
@@ -912,14 +1066,18 @@ class EvalRunner:
             },
             index=[0],
         )
-        metrics_csv_path = os.path.join(output_dir, "reconstruction_metrics.csv")
+        metrics_csv_path = os.path.join(
+            output_dir, "reconstruction_metrics.csv"
+        )
         metrics_df.to_csv(metrics_csv_path, index=False)
 
     def compute_forward_folding_metrics(self, output_dir):
         log.info(f"Calculating metrics for {output_dir}")
         top_sample_csv = eu.get_all_top_samples(output_dir)
         # top_sample_csv["fold_match_seq"] = top_sample_csv.bb_rmsd_to_gt <= 2.0
-        top_sample_csv["fold_match_seq"] = top_sample_csv.bb_tmscore_to_gt >= 0.8
+        top_sample_csv["fold_match_seq"] = (
+            top_sample_csv.bb_tmscore_to_gt >= 0.8
+        )
         metrics_df = pd.DataFrame(
             data={
                 "Total Match Seq": top_sample_csv.fold_match_seq.sum(),
@@ -957,7 +1115,11 @@ class EvalRunner:
 config_path = "../../../../configs/experiment/structok/inference"
 
 
-@hydra.main(version_base=None, config_path=config_path, config_name="inference_unconditional")
+@hydra.main(
+    version_base=None,
+    config_path=config_path,
+    config_name="inference_unconditional",
+)
 def run(cfg: DictConfig) -> None:
     os.environ["PROJECT_ROOT"] = cfg.env.PROJECT_ROOT
     # Read model checkpoint.
@@ -991,7 +1153,16 @@ def run(cfg: DictConfig) -> None:
         ]
         input_fasta_dir = cfg.inference.input_fasta_dir
         for fasta_path in sorted(
-            glob(input_fasta_dir + ("/**/*.fasta" if cfg.inference.task == "unconditional" else "/*.fasta"), recursive=False), key=natsort
+            glob(
+                input_fasta_dir
+                + (
+                    "/**/*.fasta"
+                    if cfg.inference.task == "unconditional"
+                    else "/*.fasta"
+                ),
+                recursive=False,
+            ),
+            key=natsort,
         ):
             if "struct_token" not in fasta_path and "aatype" not in fasta_path:
                 continue
@@ -999,21 +1170,27 @@ def run(cfg: DictConfig) -> None:
                 continue
             else:
                 processed_path.append(os.path.dirname(fasta_path))
-                
+
             print(fasta_path)
             if cfg.inference.task.startswith("unconditional"):
                 pdb_folder = sampler.get_pdb_from_struct_fasta(fasta_path)
                 if cfg.inference.compute_metrics:
-                    eval_folder = sampler.evaluate_unconditional(pdb_folder, inplace_save=True)
+                    eval_folder = sampler.evaluate_unconditional(
+                        pdb_folder, inplace_save=True
+                    )
                     compute_metrics(eval_folder)
             elif cfg.inference.task == "forward_folding":
                 pdb_folder = sampler.get_pdb_from_struct_fasta(fasta_path)
-                eval_folder = sampler.evaluate_forward_folding(pdb_folder, inplace_save=True)
+                eval_folder = sampler.evaluate_forward_folding(
+                    pdb_folder, inplace_save=True
+                )
                 compute_metrics(eval_folder)
             elif cfg.inference.task == "inverse_folding":
                 fasta_path = fasta_path.replace("struct_token", "aatype")
                 pdb_folder = sampler.get_pdb_from_struct_fasta(fasta_path)
-                eval_folder = sampler.evaluate_inverse_folding(fasta_path, inplace_save=True)
+                eval_folder = sampler.evaluate_inverse_folding(
+                    fasta_path, inplace_save=True
+                )
                 compute_metrics(eval_folder)
 
     elapsed_time = time.time() - start_time

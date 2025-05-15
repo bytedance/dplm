@@ -1,18 +1,24 @@
+# Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
+
+import argparse
 import os
 import warnings
 from glob import glob
-import argparse
 
 import torch
 import torch.utils
 from biotite.sequence.io import fasta
-
 from tqdm.auto import tqdm
 
 from byprot.datamodules.pdb_dataset import utils as du
-from byprot.datamodules.pdb_dataset.pdb_datamodule import PdbDataset, collate_fn
-from byprot.utils import recursive_to, get_logger
+from byprot.datamodules.pdb_dataset.pdb_datamodule import (
+    PdbDataset,
+    collate_fn,
+)
 from byprot.models.utils import get_struct_tokenizer
+from byprot.utils import get_logger, recursive_to
 
 warnings.filterwarnings("ignore")
 
@@ -35,7 +41,9 @@ def run_tokenize(struct_tokenizer, input_pdb_folder, output_dir):
         log.info(f"Processing {pdb_path}")
 
         # predicted structures
-        feats = load_from_pdb(pdb_path, process_chain=struct_tokenizer.process_chain)
+        feats = load_from_pdb(
+            pdb_path, process_chain=struct_tokenizer.process_chain
+        )
         feats["pdb_path"] = pdb_path
         feats["header"] = feats["pdb_name"]
 
@@ -55,11 +63,17 @@ def run_tokenize(struct_tokenizer, input_pdb_folder, output_dir):
     device = next(struct_tokenizer.parameters()).device
     for batch in pbar:
         pdb_name = batch["pdb_name"][0]
-        pbar.set_description(f"Tokenize: {pdb_name} (L={batch['seq_length'][0]})")
+        pbar.set_description(
+            f"Tokenize: {pdb_name} (L={batch['seq_length'][0]})"
+        )
         batch = recursive_to(batch, device)
 
-        struct_ids = struct_tokenizer.tokenize(batch['all_atom_positions'], batch['res_mask'], batch['seq_length'])
-        struct_seq = struct_tokenizer.struct_ids_to_seq(struct_ids.cpu().tolist()[0])
+        struct_ids = struct_tokenizer.tokenize(
+            batch["all_atom_positions"], batch["res_mask"], batch["seq_length"]
+        )
+        struct_seq = struct_tokenizer.struct_ids_to_seq(
+            struct_ids.cpu().tolist()[0]
+        )
         all_header_struct_seq.append((pdb_name, struct_seq))
 
         aa_seq = du.aatype_to_seq(batch["aatype"].cpu().tolist()[0])
@@ -70,15 +84,21 @@ def run_tokenize(struct_tokenizer, input_pdb_folder, output_dir):
 
     output_aa_fasta_path = os.path.join(output_dir, "aa_seq.fasta")
     fasta.FastaFile.write_iter(output_aa_fasta_path, all_header_aa_seq)
-    
+
 
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input_pdb_folder", type=str, default="/path/to/input/pdb/folder")
-    parser.add_argument("--output_dir", type=str, default="./generation-results/tokenized_protein")
+    parser.add_argument(
+        "--input_pdb_folder", type=str, default="/path/to/input/pdb/folder"
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="./generation-results/tokenized_protein",
+    )
     args = parser.parse_args()
-    
+
     struct_tokenizer = get_struct_tokenizer()
     struct_tokenizer = struct_tokenizer.cuda()
     run_tokenize(struct_tokenizer, args.input_pdb_folder, args.output_dir)

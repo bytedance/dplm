@@ -1,3 +1,14 @@
+# Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file has been modified by Xinyou Wang on May 15, 2025
+#
+# Original file was released under MIT, with the full license text
+# available at https://github.com/jasonkyuyim/multiflow/blob/main/LICENSE
+#
+# This modified file is released under the same license.
+
+
 import collections
 import dataclasses
 import os
@@ -27,17 +38,33 @@ INT_TO_CHAIN = {i: chain_char for i, chain_char in enumerate(ALPHANUMERIC)}
 NM_TO_ANG_SCALE = 10.0
 ANG_TO_NM_SCALE = 1 / NM_TO_ANG_SCALE
 
-CHAIN_FEATS = ["atom_positions", "aatype", "atom_mask", "residue_index", "b_factors"]
+CHAIN_FEATS = [
+    "atom_positions",
+    "aatype",
+    "atom_mask",
+    "residue_index",
+    "b_factors",
+]
 
 NUM_TOKENS = residue_constants.restype_num
 MASK_TOKEN_INDEX = residue_constants.restypes_with_x.index("X")
 CA_IDX = residue_constants.atom_order["CA"]
 
 to_numpy = lambda x: x.detach().cpu().numpy()
-aatype_to_seq = lambda aatype: "".join([residue_constants.restypes_with_x[x] for x in aatype])
-seq_to_aatype = lambda seq: [residue_constants.restypes_with_x.index(x) for x in seq]
+aatype_to_seq = lambda aatype: "".join(
+    [residue_constants.restypes_with_x[x] for x in aatype]
+)
+seq_to_aatype = lambda seq: [
+    residue_constants.restypes_with_x.index(x) for x in seq
+]
 
-CHAIN_FEATS = ["atom_positions", "aatype", "atom_mask", "residue_index", "b_factors"]
+CHAIN_FEATS = [
+    "atom_positions",
+    "aatype",
+    "atom_mask",
+    "residue_index",
+    "b_factors",
+]
 UNPADDED_FEATS = [
     "t",
     "rot_score_scaling",
@@ -61,16 +88,21 @@ def pad_feats(raw_feats, max_len, use_torch=False):
     padded_feats = {
         feat_name: pad(feat, max_len, use_torch=use_torch)
         for feat_name, feat in raw_feats.items()
-        if feat_name not in UNPADDED_FEATS + RIGID_FEATS and hasattr(feat, "shape")
+        if feat_name not in UNPADDED_FEATS + RIGID_FEATS
+        and hasattr(feat, "shape")
     }
     for feat_name in PAIR_FEATS:
         if feat_name in padded_feats:
-            padded_feats[feat_name] = pad(padded_feats[feat_name], max_len, pad_idx=1)
+            padded_feats[feat_name] = pad(
+                padded_feats[feat_name], max_len, pad_idx=1
+            )
     for feat_name in RIGID_FEATS:
         if feat_name in raw_feats:
             padded_feats[feat_name] = pad_rigid(raw_feats[feat_name], max_len)
     for feat_name in raw_feats:
-        if feat_name in UNPADDED_FEATS or isinstance(raw_feats[feat_name], str):
+        if feat_name in UNPADDED_FEATS or isinstance(
+            raw_feats[feat_name], str
+        ):
             padded_feats[feat_name] = raw_feats[feat_name]
     return padded_feats
 
@@ -108,7 +140,9 @@ def pad(x: np.ndarray, max_len: int, dim=0, use_torch=False, reverse=False):
         pad_widths[dim] = (0, pad_amt)
     if use_torch:
         pad_widths = reversed(pad_widths)
-        pad_widths = tuple([item for pad_width in pad_widths for item in pad_width])
+        pad_widths = tuple(
+            [item for pad_width in pad_widths for item in pad_width]
+        )
         # print(pad_widths)
         return torch.nn.functional.pad(x, pad_widths)
     return np.pad(x, pad_widths)
@@ -186,18 +220,23 @@ def batch_align_structures(pos_1, pos_2, mask=None):
 
     flat_mask = mask.reshape(-1).bool()
     _, _, align_rots = align_structures(
-        flat_pos_1[flat_mask], flat_batch_indices[flat_mask], flat_pos_2[flat_mask]
+        flat_pos_1[flat_mask],
+        flat_batch_indices[flat_mask],
+        flat_pos_2[flat_mask],
     )
     aligned_pos_1 = torch.bmm(pos_1, align_rots)
     return aligned_pos_1, pos_2, align_rots
 
 
-def adjust_oxygen_pos(atom_37: torch.Tensor, pos_is_known=None) -> torch.Tensor:
-    """
-    Imputes the position of the oxygen atom on the backbone by using adjacent frame information.
-    Specifically, we say that the oxygen atom is in the plane created by the Calpha and C from the
-    current frame and the nitrogen of the next frame. The oxygen is then placed c_o_bond_length Angstrom
-    away from the C in the current frame in the direction away from the Ca-C-N triangle.
+def adjust_oxygen_pos(
+    atom_37: torch.Tensor, pos_is_known=None
+) -> torch.Tensor:
+    """Imputes the position of the oxygen atom on the backbone by using
+    adjacent frame information. Specifically, we say that the oxygen atom is in
+    the plane created by the Calpha and C from the current frame and the
+    nitrogen of the next frame. The oxygen is then placed c_o_bond_length
+    Angstrom away from the C in the current frame in the direction away from
+    the Ca-C-N triangle.
 
     For cases where the next frame is not available, for example we are at the C-terminus or the
     next frame is not available in the data then we place the oxygen in the same plane as the
@@ -217,18 +256,28 @@ def adjust_oxygen_pos(atom_37: torch.Tensor, pos_is_known=None) -> torch.Tensor:
     # Note that the (N,) ordering is from N-terminal to C-terminal.
 
     # Calpha to carbonyl both in the current frame.
-    calpha_to_carbonyl: torch.Tensor = (atom_37[:-1, 2, :] - atom_37[:-1, 1, :]) / (
-        torch.norm(atom_37[:-1, 2, :] - atom_37[:-1, 1, :], keepdim=True, dim=1) + 1e-7
+    calpha_to_carbonyl: torch.Tensor = (
+        atom_37[:-1, 2, :] - atom_37[:-1, 1, :]
+    ) / (
+        torch.norm(
+            atom_37[:-1, 2, :] - atom_37[:-1, 1, :], keepdim=True, dim=1
+        )
+        + 1e-7
     )
     # For masked positions, they are all 0 and so we add 1e-7 to avoid division by 0.
     # The positions are in Angstroms and so are on the order ~1 so 1e-7 is an insignificant change.
 
     # Nitrogen of the next frame to carbonyl of the current frame.
-    nitrogen_to_carbonyl: torch.Tensor = (atom_37[:-1, 2, :] - atom_37[1:, 0, :]) / (
-        torch.norm(atom_37[:-1, 2, :] - atom_37[1:, 0, :], keepdim=True, dim=1) + 1e-7
+    nitrogen_to_carbonyl: torch.Tensor = (
+        atom_37[:-1, 2, :] - atom_37[1:, 0, :]
+    ) / (
+        torch.norm(atom_37[:-1, 2, :] - atom_37[1:, 0, :], keepdim=True, dim=1)
+        + 1e-7
     )
 
-    carbonyl_to_oxygen: torch.Tensor = calpha_to_carbonyl + nitrogen_to_carbonyl  # (N-1, 3)
+    carbonyl_to_oxygen: torch.Tensor = (
+        calpha_to_carbonyl + nitrogen_to_carbonyl
+    )  # (N-1, 3)
     carbonyl_to_oxygen = carbonyl_to_oxygen / (
         torch.norm(carbonyl_to_oxygen, dim=1, keepdim=True) + 1e-7
     )
@@ -238,12 +287,18 @@ def adjust_oxygen_pos(atom_37: torch.Tensor, pos_is_known=None) -> torch.Tensor:
     # Now we deal with frames for which there is no next frame available.
 
     # Calpha to carbonyl both in the current frame. (N, 3)
-    calpha_to_carbonyl_term: torch.Tensor = (atom_37[:, 2, :] - atom_37[:, 1, :]) / (
-        torch.norm(atom_37[:, 2, :] - atom_37[:, 1, :], keepdim=True, dim=1) + 1e-7
+    calpha_to_carbonyl_term: torch.Tensor = (
+        atom_37[:, 2, :] - atom_37[:, 1, :]
+    ) / (
+        torch.norm(atom_37[:, 2, :] - atom_37[:, 1, :], keepdim=True, dim=1)
+        + 1e-7
     )
     # Calpha to nitrogen both in the current frame. (N, 3)
-    calpha_to_nitrogen_term: torch.Tensor = (atom_37[:, 0, :] - atom_37[:, 1, :]) / (
-        torch.norm(atom_37[:, 0, :] - atom_37[:, 1, :], keepdim=True, dim=1) + 1e-7
+    calpha_to_nitrogen_term: torch.Tensor = (
+        atom_37[:, 0, :] - atom_37[:, 1, :]
+    ) / (
+        torch.norm(atom_37[:, 0, :] - atom_37[:, 1, :], keepdim=True, dim=1)
+        + 1e-7
     )
     carbonyl_to_oxygen_term: torch.Tensor = (
         calpha_to_carbonyl_term + calpha_to_nitrogen_term
@@ -263,23 +318,29 @@ def adjust_oxygen_pos(atom_37: torch.Tensor, pos_is_known=None) -> torch.Tensor:
 
     next_res_gone: torch.Tensor = ~pos_is_known.bool()  # (N,)
     next_res_gone = torch.cat(
-        [next_res_gone, torch.ones((1,), device=pos_is_known.device).bool()], dim=0
+        [next_res_gone, torch.ones((1,), device=pos_is_known.device).bool()],
+        dim=0,
     )  # (N+1, )
     next_res_gone = next_res_gone[1:]  # (N,)
 
     atom_37[next_res_gone, 4, :] = (
-        atom_37[next_res_gone, 2, :] + carbonyl_to_oxygen_term[next_res_gone, :] * 1.23
+        atom_37[next_res_gone, 2, :]
+        + carbonyl_to_oxygen_term[next_res_gone, :] * 1.23
     )
 
     return atom_37
 
 
-def write_pkl(save_path: str, pkl_data: Any, create_dir: bool = False, use_torch=False):
+def write_pkl(
+    save_path: str, pkl_data: Any, create_dir: bool = False, use_torch=False
+):
     """Serialize data into a pickle file."""
     if create_dir:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
     if use_torch:
-        torch.save(pkl_data, save_path, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+        torch.save(
+            pkl_data, save_path, pickle_protocol=pickle.HIGHEST_PROTOCOL
+        )
     else:
         with open(save_path, "wb") as handle:
             pickle.dump(pkl_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -299,7 +360,9 @@ def read_pkl(read_path: str, verbose=True, use_torch=False, map_location=None):
                 return CPU_Unpickler(handle).load()
         except Exception as e2:
             if verbose:
-                print(f"Failed to read {read_path}. First error: {e}\n Second error: {e2}")
+                print(
+                    f"Failed to read {read_path}. First error: {e}\n Second error: {e2}"
+                )
             raise (e)
 
 
@@ -315,20 +378,28 @@ def chain_str_to_int(chain_str: str):
 def parse_chain_feats(chain_feats, scale_factor=1.0):
     nan_atom_mask = np.isnan(chain_feats["atom_positions"].sum(-1))
     chain_feats["atom_mask"][nan_atom_mask] = 0
-    chain_feats["atom_positions"] = np.nan_to_num(chain_feats["atom_positions"], nan=0.0)
+    chain_feats["atom_positions"] = np.nan_to_num(
+        chain_feats["atom_positions"], nan=0.0
+    )
 
     ca_idx = residue_constants.atom_order["CA"]
     chain_feats["bb_mask"] = chain_feats["atom_mask"][:, ca_idx]
     bb_pos = chain_feats["atom_positions"][:, ca_idx]
-    bb_center = np.sum(bb_pos, axis=0) / (np.sum(chain_feats["bb_mask"]) + 1e-5)
+    bb_center = np.sum(bb_pos, axis=0) / (
+        np.sum(chain_feats["bb_mask"]) + 1e-5
+    )
     centered_pos = chain_feats["atom_positions"] - bb_center[None, None, :]
     scaled_pos = centered_pos / scale_factor
-    chain_feats["atom_positions"] = scaled_pos * chain_feats["atom_mask"][..., None]
+    chain_feats["atom_positions"] = (
+        scaled_pos * chain_feats["atom_mask"][..., None]
+    )
     chain_feats["bb_positions"] = chain_feats["atom_positions"][:, ca_idx]
     return chain_feats
 
 
-def concat_np_features(np_dicts: List[Dict[str, np.ndarray]], add_batch_dim: bool):
+def concat_np_features(
+    np_dicts: List[Dict[str, np.ndarray]], add_batch_dim: bool
+):
     """Performs a nested concatenation of feature dicts.
 
     Args:
@@ -351,9 +422,10 @@ def concat_np_features(np_dicts: List[Dict[str, np.ndarray]], add_batch_dim: boo
     return combined_dict
 
 
-def center_zero(pos: torch.Tensor, batch_indexes: torch.LongTensor) -> torch.Tensor:
-    """
-    Move the molecule center to zero for sparse position tensors.
+def center_zero(
+    pos: torch.Tensor, batch_indexes: torch.LongTensor
+) -> torch.Tensor:
+    """Move the molecule center to zero for sparse position tensors.
 
     Args:
         pos: [N, 3] batch positions of atoms in the molecule in sparse batch format.
@@ -362,7 +434,9 @@ def center_zero(pos: torch.Tensor, batch_indexes: torch.LongTensor) -> torch.Ten
     Returns:
         pos: [N, 3] zero-centered batch positions of atoms in the molecule in sparse batch format.
     """
-    assert len(pos.shape) == 2 and pos.shape[-1] == 3, "pos must have shape [N, 3]"
+    assert (
+        len(pos.shape) == 2 and pos.shape[-1] == 3
+    ), "pos must have shape [N, 3]"
 
     means = scatter(pos, batch_indexes, dim=0, reduce="mean")
     return pos - means[batch_indexes]
@@ -375,13 +449,14 @@ def align_structures(
     reference_positions: torch.Tensor,
     broadcast_reference: bool = False,
 ):
-    """
-    Align structures in a ChemGraph batch to a reference, e.g. for RMSD computation. This uses the
-    sparse formulation of pytorch geometric. If the ChemGraph is composed of a single system, then
-    the reference can be given as a single structure and broadcasted. Returns the structure
-    coordinates shifted to the geometric center and the batch structures rotated to match the
-    reference structures. Uses the Kabsch algorithm (see e.g. [kabsch_align1]_). No permutation of
-    atoms is carried out.
+    """Align structures in a ChemGraph batch to a reference, e.g. for RMSD
+    computation. This uses the sparse formulation of pytorch geometric. If the
+    ChemGraph is composed of a single system, then the reference can be given
+    as a single structure and broadcasted. Returns the structure coordinates
+    shifted to the geometric center and the batch structures rotated to match
+    the reference structures. Uses the Kabsch algorithm (see e.g.
+
+    [kabsch_align1]_). No permutation of atoms is carried out.
 
     Args:
         batch_positions (Tensor): Batch of structures (e.g. from ChemGraph) which should be aligned
@@ -424,7 +499,9 @@ def align_structures(
 
     # Compute covariance matrix for optimal rotation (Q.T @ P) -> [B x 3 x 3].
     cov = scatter_add(
-        batch_positions[:, None, :] * reference_positions[:, :, None], batch_indices, dim=0
+        batch_positions[:, None, :] * reference_positions[:, :, None],
+        batch_indices,
+        dim=0,
     )
 
     # Perform singular value decomposition. (all [B x 3 x 3])
@@ -477,7 +554,9 @@ def process_mmcif(mmcif_path: str, max_resolution: int, max_len: int):
     processed_mmcif_path = os.path.abspath(processed_mmcif_path)
     metadata["processed_path"] = processed_mmcif_path
     with open(mmcif_path, "r") as f:
-        parsed_mmcif = mmcif_parsing.parse(file_id=mmcif_name, mmcif_string=f.read())
+        parsed_mmcif = mmcif_parsing.parse(
+            file_id=mmcif_name, mmcif_string=f.read()
+        )
     metadata["raw_path"] = mmcif_path
     if parsed_mmcif.errors:
         raise MmcifParsingError(f"Encountered errors {parsed_mmcif.errors}")
@@ -507,7 +586,10 @@ def process_mmcif(mmcif_path: str, max_resolution: int, max_len: int):
         raise ResolutionError(f"Invalid resolution {mmcif_resolution}")
 
     # Extract all chains
-    struct_chains = {chain.id.upper(): chain for chain in parsed_mmcif.structure.get_chains()}
+    struct_chains = {
+        chain.id.upper(): chain
+        for chain in parsed_mmcif.structure.get_chains()
+    }
     metadata["num_chains"] = len(struct_chains)
 
     # Extract features
@@ -541,9 +623,15 @@ def process_mmcif(mmcif_path: str, max_resolution: int, max_len: int):
         raise LengthError(f"Too long {complex_aatype.shape[0]}")
 
     chain_dict["ss"] = pdb_ss[0]
-    metadata["coil_percent"] = np.sum(pdb_ss == "C") / metadata["modeled_seq_len"]
-    metadata["helix_percent"] = np.sum(pdb_ss == "H") / metadata["modeled_seq_len"]
-    metadata["strand_percent"] = np.sum(pdb_ss == "E") / metadata["modeled_seq_len"]
+    metadata["coil_percent"] = (
+        np.sum(pdb_ss == "C") / metadata["modeled_seq_len"]
+    )
+    metadata["helix_percent"] = (
+        np.sum(pdb_ss == "H") / metadata["modeled_seq_len"]
+    )
+    metadata["strand_percent"] = (
+        np.sum(pdb_ss == "E") / metadata["modeled_seq_len"]
+    )
 
     # Radius of gyration
     metadata["radius_gyration"] = pdb_dg[0]
@@ -575,7 +663,9 @@ def process_pdb_file(file_path: str):
     structure = parser.get_structure(pdb_name, file_path)
 
     # Extract all chains
-    struct_chains = {chain.id.upper(): chain for chain in structure.get_chains()}
+    struct_chains = {
+        chain.id.upper(): chain for chain in structure.get_chains()
+    }
     metadata["num_chains"] = len(struct_chains)
 
     # Extract features
@@ -617,9 +707,15 @@ def process_pdb_file(file_path: str):
         raise DataError(f"Mdtraj failed with error {e}")
 
     chain_dict["ss"] = pdb_ss[0]
-    metadata["coil_percent"] = np.sum(pdb_ss == "C") / metadata["modeled_seq_len"]
-    metadata["helix_percent"] = np.sum(pdb_ss == "H") / metadata["modeled_seq_len"]
-    metadata["strand_percent"] = np.sum(pdb_ss == "E") / metadata["modeled_seq_len"]
+    metadata["coil_percent"] = (
+        np.sum(pdb_ss == "C") / metadata["modeled_seq_len"]
+    )
+    metadata["helix_percent"] = (
+        np.sum(pdb_ss == "H") / metadata["modeled_seq_len"]
+    )
+    metadata["strand_percent"] = (
+        np.sum(pdb_ss == "E") / metadata["modeled_seq_len"]
+    )
 
     # Radius of gyration
     metadata["radius_gyration"] = pdb_dg[0]
@@ -705,7 +801,9 @@ def process_chain(chain: Chain, chain_id: str) -> Protein:
                 continue
             pos[residue_constants.atom_order[atom.name]] = atom.coord
             mask[residue_constants.atom_order[atom.name]] = 1.0
-            res_b_factors[residue_constants.atom_order[atom.name]] = atom.bfactor
+            res_b_factors[
+                residue_constants.atom_order[atom.name]
+            ] = atom.bfactor
         aatype.append(restype_idx)
         atom_positions.append(pos)
         atom_mask.append(mask)

@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Utilities for calculating all atom representations.
+"""Utilities for calculating all atom representations.
+
 Code adapted from OpenFold.
 """
 
@@ -31,8 +31,12 @@ Rotation = ru.Rotation
 # Residue Constants from OpenFold/AlphaFold2.
 
 
-IDEALIZED_POS = torch.tensor(residue_constants.restype_atom14_rigid_group_positions)
-DEFAULT_FRAMES = torch.tensor(residue_constants.restype_rigid_group_default_frame)
+IDEALIZED_POS = torch.tensor(
+    residue_constants.restype_atom14_rigid_group_positions
+)
+DEFAULT_FRAMES = torch.tensor(
+    residue_constants.restype_rigid_group_default_frame
+)
 ATOM_MASK = torch.tensor(residue_constants.restype_atom14_mask)
 GROUP_IDX = torch.tensor(residue_constants.restype_atom14_to_rigid_group)
 
@@ -40,7 +44,8 @@ GROUP_IDX = torch.tensor(residue_constants.restype_atom14_to_rigid_group)
 def to_atom37(trans, rots):
     num_batch, num_res, _ = trans.shape
     final_atom37 = compute_backbone(
-        du.create_rigid(rots, trans), torch.zeros(num_batch, num_res, 2, device=trans.device)
+        du.create_rigid(rots, trans),
+        torch.zeros(num_batch, num_res, 2, device=trans.device),
     )[0]
     return final_atom37
 
@@ -59,7 +64,6 @@ def torsion_angles_to_frames(
 
     Returns:
         All 8 frames corresponding to each torsion frame.
-
     """
     # [*, N, 8, 4, 4]
     with torch.no_grad():
@@ -74,7 +78,9 @@ def torsion_angles_to_frames(
     bb_rot[..., 1] = 1
 
     # [*, N, 8, 2]
-    alpha = torch.cat([bb_rot.expand(*alpha.shape[:-2], -1, -1), alpha], dim=-2)
+    alpha = torch.cat(
+        [bb_rot.expand(*alpha.shape[:-2], -1, -1), alpha], dim=-2
+    )
 
     # [*, N, 8, 3, 3]
     # Produces rotation matrices of the form:
@@ -127,7 +133,9 @@ def prot_to_torsion_angles(aatype, atom37, atom37_mask):
         "all_atom_positions": atom37,
         "all_atom_mask": atom37_mask,
     }
-    torsion_angles_feats = data_transforms.atom37_to_torsion_angles()(prot_feats)
+    torsion_angles_feats = data_transforms.atom37_to_torsion_angles()(
+        prot_feats
+    )
     torsion_angles = torsion_angles_feats["torsion_angles_sin_cos"]
     torsion_mask = torsion_angles_feats["torsion_angles_mask"]
     return torsion_angles, torsion_mask
@@ -144,7 +152,6 @@ def frames_to_atom14_pos(
         aatype: Residue types. [..., N]
 
     Returns:
-
     """
     with torch.no_grad():
         group_mask = GROUP_IDX.to(aatype.device)[aatype, ...]
@@ -159,7 +166,9 @@ def frames_to_atom14_pos(
     t_atoms_to_global = r[..., None, :] * group_mask  # type: ignore [index]
 
     # [*, N, 14]
-    t_atoms_to_global = t_atoms_to_global.map_tensor_fn(lambda x: torch.sum(x, dim=-1))
+    t_atoms_to_global = t_atoms_to_global.map_tensor_fn(
+        lambda x: torch.sum(x, dim=-1)
+    )
 
     # [*, N, 14, 3]
     pred_positions = t_atoms_to_global.apply(frame_null_pos)
@@ -170,7 +179,8 @@ def frames_to_atom14_pos(
 
 def compute_backbone(bb_rigids, psi_torsions):
     torsion_angles = torch.tile(
-        psi_torsions[..., None, :], tuple([1 for _ in range(len(bb_rigids.shape))]) + (7, 1)
+        psi_torsions[..., None, :],
+        tuple([1 for _ in range(len(bb_rigids.shape))]) + (7, 1),
     )
     aatype = torch.zeros(bb_rigids.shape, device=bb_rigids.device).long()
     # aatype = torch.zeros(bb_rigids.shape).long().to(bb_rigids.device)
@@ -180,7 +190,9 @@ def compute_backbone(bb_rigids, psi_torsions):
         aatype,
     )
     atom14_pos = frames_to_atom14_pos(all_frames, aatype)
-    atom37_bb_pos = torch.zeros(bb_rigids.shape + (37, 3), device=bb_rigids.device)
+    atom37_bb_pos = torch.zeros(
+        bb_rigids.shape + (37, 3), device=bb_rigids.device
+    )
     # atom14 bb order = ['N', 'CA', 'C', 'O', 'CB']
     # atom37 bb order = ['N', 'CA', 'C', 'CB', 'O']
     atom37_bb_pos[..., :3, :] = atom14_pos[..., :3, :]
@@ -216,8 +228,7 @@ def calculate_neighbor_angles(R_ac, R_ab):
 
 
 def vector_projection(R_ab, P_n):
-    """
-    Project the vector R_ab onto a plane with normal vector P_n.
+    """Project the vector R_ab onto a plane with normal vector P_n.
 
     Parameters
     ----------
@@ -243,7 +254,10 @@ def transrot_to_atom37(transrot_traj, res_mask):
     for trans, rots in transrot_traj:
         rigids = du.create_rigid(rots, trans)
         atom37 = compute_backbone(
-            rigids, torch.zeros(trans.shape[0], trans.shape[1], 2, device=trans.device)
+            rigids,
+            torch.zeros(
+                trans.shape[0], trans.shape[1], 2, device=trans.device
+            ),
         )[0]
         atom37 = atom37.detach().cpu()
         batch_atom37 = []
@@ -256,7 +270,8 @@ def transrot_to_atom37(transrot_traj, res_mask):
 def atom37_from_trans_rot(trans, rots, res_mask):
     rigids = du.create_rigid(rots, trans)
     atom37 = compute_backbone(
-        rigids, torch.zeros(trans.shape[0], trans.shape[1], 2, device=trans.device)
+        rigids,
+        torch.zeros(trans.shape[0], trans.shape[1], 2, device=trans.device),
     )[0]
     atom37 = atom37.detach().cpu()
     batch_atom37 = []
@@ -275,12 +290,16 @@ def process_trans_rot_traj(trans_traj, rots_traj, res_mask):
     atom37_traj = torch.stack(atom37_traj).swapaxes(0, 1)
     return atom37_traj
 
-def adjust_oxygen_pos(atom_37: torch.Tensor, pos_is_known=None) -> torch.Tensor:
-    """
-    Imputes the position of the oxygen atom on the backbone by using adjacent frame information.
-    Specifically, we say that the oxygen atom is in the plane created by the Calpha and C from the
-    current frame and the nitrogen of the next frame. The oxygen is then placed c_o_bond_length Angstrom
-    away from the C in the current frame in the direction away from the Ca-C-N triangle.
+
+def adjust_oxygen_pos(
+    atom_37: torch.Tensor, pos_is_known=None
+) -> torch.Tensor:
+    """Imputes the position of the oxygen atom on the backbone by using
+    adjacent frame information. Specifically, we say that the oxygen atom is in
+    the plane created by the Calpha and C from the current frame and the
+    nitrogen of the next frame. The oxygen is then placed c_o_bond_length
+    Angstrom away from the C in the current frame in the direction away from
+    the Ca-C-N triangle.
 
     For cases where the next frame is not available, for example we are at the C-terminus or the
     next frame is not available in the data then we place the oxygen in the same plane as the
@@ -300,18 +319,28 @@ def adjust_oxygen_pos(atom_37: torch.Tensor, pos_is_known=None) -> torch.Tensor:
     # Note that the (N,) ordering is from N-terminal to C-terminal.
 
     # Calpha to carbonyl both in the current frame.
-    calpha_to_carbonyl: torch.Tensor = (atom_37[:-1, 2, :] - atom_37[:-1, 1, :]) / (
-        torch.norm(atom_37[:-1, 2, :] - atom_37[:-1, 1, :], keepdim=True, dim=1) + 1e-7
+    calpha_to_carbonyl: torch.Tensor = (
+        atom_37[:-1, 2, :] - atom_37[:-1, 1, :]
+    ) / (
+        torch.norm(
+            atom_37[:-1, 2, :] - atom_37[:-1, 1, :], keepdim=True, dim=1
+        )
+        + 1e-7
     )
     # For masked positions, they are all 0 and so we add 1e-7 to avoid division by 0.
     # The positions are in Angstroms and so are on the order ~1 so 1e-7 is an insignificant change.
 
     # Nitrogen of the next frame to carbonyl of the current frame.
-    nitrogen_to_carbonyl: torch.Tensor = (atom_37[:-1, 2, :] - atom_37[1:, 0, :]) / (
-        torch.norm(atom_37[:-1, 2, :] - atom_37[1:, 0, :], keepdim=True, dim=1) + 1e-7
+    nitrogen_to_carbonyl: torch.Tensor = (
+        atom_37[:-1, 2, :] - atom_37[1:, 0, :]
+    ) / (
+        torch.norm(atom_37[:-1, 2, :] - atom_37[1:, 0, :], keepdim=True, dim=1)
+        + 1e-7
     )
 
-    carbonyl_to_oxygen: torch.Tensor = calpha_to_carbonyl + nitrogen_to_carbonyl  # (N-1, 3)
+    carbonyl_to_oxygen: torch.Tensor = (
+        calpha_to_carbonyl + nitrogen_to_carbonyl
+    )  # (N-1, 3)
     carbonyl_to_oxygen = carbonyl_to_oxygen / (
         torch.norm(carbonyl_to_oxygen, dim=1, keepdim=True) + 1e-7
     )
@@ -321,12 +350,18 @@ def adjust_oxygen_pos(atom_37: torch.Tensor, pos_is_known=None) -> torch.Tensor:
     # Now we deal with frames for which there is no next frame available.
 
     # Calpha to carbonyl both in the current frame. (N, 3)
-    calpha_to_carbonyl_term: torch.Tensor = (atom_37[:, 2, :] - atom_37[:, 1, :]) / (
-        torch.norm(atom_37[:, 2, :] - atom_37[:, 1, :], keepdim=True, dim=1) + 1e-7
+    calpha_to_carbonyl_term: torch.Tensor = (
+        atom_37[:, 2, :] - atom_37[:, 1, :]
+    ) / (
+        torch.norm(atom_37[:, 2, :] - atom_37[:, 1, :], keepdim=True, dim=1)
+        + 1e-7
     )
     # Calpha to nitrogen both in the current frame. (N, 3)
-    calpha_to_nitrogen_term: torch.Tensor = (atom_37[:, 0, :] - atom_37[:, 1, :]) / (
-        torch.norm(atom_37[:, 0, :] - atom_37[:, 1, :], keepdim=True, dim=1) + 1e-7
+    calpha_to_nitrogen_term: torch.Tensor = (
+        atom_37[:, 0, :] - atom_37[:, 1, :]
+    ) / (
+        torch.norm(atom_37[:, 0, :] - atom_37[:, 1, :], keepdim=True, dim=1)
+        + 1e-7
     )
     carbonyl_to_oxygen_term: torch.Tensor = (
         calpha_to_carbonyl_term + calpha_to_nitrogen_term
@@ -346,12 +381,14 @@ def adjust_oxygen_pos(atom_37: torch.Tensor, pos_is_known=None) -> torch.Tensor:
 
     next_res_gone: torch.Tensor = ~pos_is_known.bool()  # (N,)
     next_res_gone = torch.cat(
-        [next_res_gone, torch.ones((1,), device=pos_is_known.device).bool()], dim=0
+        [next_res_gone, torch.ones((1,), device=pos_is_known.device).bool()],
+        dim=0,
     )  # (N+1, )
     next_res_gone = next_res_gone[1:]  # (N,)
 
     atom_37[next_res_gone, 4, :] = (
-        atom_37[next_res_gone, 2, :] + carbonyl_to_oxygen_term[next_res_gone, :] * 1.23
+        atom_37[next_res_gone, 2, :]
+        + carbonyl_to_oxygen_term[next_res_gone, :] * 1.23
     )
 
     return atom_37

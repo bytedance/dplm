@@ -1,3 +1,14 @@
+# Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file has been modified by Xinyou Wang on May 15, 2025
+#
+# Original file was released under MIT, with the full license text
+# available at https://github.com/jasonkyuyim/multiflow/blob/main/LICENSE
+#
+# This modified file is released under the same license.
+
+
 import glob
 import json
 import logging
@@ -12,7 +23,6 @@ from biotite.sequence.io import fasta
 
 
 class FoldingModel:
-
     def __init__(self, cfg, device_id=None):
         self._print_logger = logging.getLogger(__name__)
         self._cfg = cfg
@@ -38,7 +48,9 @@ class FoldingModel:
         elif self._cfg.folding_model == "af2":
             folded_output = self._af2_model(fasta_path, output_dir)
         else:
-            raise ValueError(f"Unknown folding model: {self._cfg.folding_model}")
+            raise ValueError(
+                f"Unknown folding model: {self._cfg.folding_model}"
+            )
         return folded_output
 
     @torch.no_grad()
@@ -48,7 +60,12 @@ class FoldingModel:
             # torch.hub.set_dir(self._cfg.pt_hub_dir)
             self._esmf = esm.pretrained.esmfold_v1().eval().to(self.device)
         fasta_seqs = fasta.FastaFile.read(fasta_path)
-        folded_outputs = {"folded_path": [], "header": [], "plddt": [], "seq": []}
+        folded_outputs = {
+            "folded_path": [],
+            "header": [],
+            "plddt": [],
+            "seq": [],
+        }
         for header, string in fasta_seqs.items():
             # Run ESMFold
             # Need to convert unknown amino acids to alanine since ESMFold
@@ -127,7 +144,10 @@ class FoldingModel:
         process = subprocess.Popen(
             [
                 "python",
-                os.path.join(self._cfg.pmpnn_path, "helper_scripts/parse_multiple_chains.py"),
+                os.path.join(
+                    self._cfg.pmpnn_path,
+                    "helper_scripts/parse_multiple_chains.py",
+                ),
                 f"--input_path={input_dir}",
                 f"--output_path={output_path}",
             ],
@@ -160,7 +180,7 @@ class FoldingModel:
             pmpnn_args, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
         )
         _ = process.wait()
-    
+
     # def run_pmpnn(self, input_dir, output_path):
 
     #     os.makedirs(os.path.join(input_dir, "seqs"), exist_ok=True)
@@ -177,7 +197,7 @@ class FoldingModel:
     #     _ = process.wait()
     #     # stdout_data, stderr_data = process.communicate()
     #     # print(stdout_data, stderr_data)
-        
+
     #     pdb_name = input_dir.split('/')[-5]
     #     df = pd.read_csv('/'.join(input_dir.split('/')[:-8]) + f"/scaffold_info/{pdb_name}.csv")
     #     index = int(input_dir.split('/')[-2].split('_')[1].split('.')[0])
@@ -188,7 +208,7 @@ class FoldingModel:
     #         end_idx = end_idxs[i]
     #         position_list += list(np.arange(start_idx, end_idx + 1) + 1)
     #     position_list = ' '.join([str(a) for a in position_list])
-        
+
     #     fixed_pos_output_path = output_path.replace("sample.pdb", "sample_fixed_pos.pdb")
     #     process = subprocess.Popen(
     #         [
@@ -204,7 +224,7 @@ class FoldingModel:
     #         stderr=subprocess.STDOUT,
     #     )
     #     _ = process.wait()
-        
+
     #     pmpnn_args = [
     #         "python",
     #         os.path.join(self._cfg.pmpnn_path, "protein_mpnn_run.py"),

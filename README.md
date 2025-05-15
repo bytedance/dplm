@@ -10,7 +10,7 @@
 
 This repository contains the official implementation of training and inference as well as the pre-trained weights for the Family of Diffusion Protein Language Models (DPLM), including:
 - `DPLM` from ICML'24 paper ["Diffusion Language Models Are Versatile Protein Learners"](https://arxiv.org/abs/2402.18567), which introduces **d**iffusion **p**rotein **l**anguage **m**odel (DPLM), a versatile protein language model that demonstrates strong generative and predictive capabilities for protein sequences.
-- `DPLM-2` from ICLR'25 paper ["DPLM-2: A Multimodal Diffusion Protein Language Model"](https://arxiv.org/abs/2410.13782), a multimodal protein foundation model that extends discrete diffusion protein language model to accommodate both sequences and structures. 
+- `DPLM-2` from ICLR'25 paper ["DPLM-2: A Multimodal Diffusion Protein Language Model"](https://arxiv.org/abs/2410.13782), a multimodal protein foundation model that extends discrete diffusion protein language model to accommodate both sequences and structures.
 - ICML'25 spotlight paper ["Elucidating the Design Space of Multimodal Protein Language Models"](https://arxiv.org/abs/2504.11454), where we elucidate the challenges of structure modeling of multimodal protein language models (e.g., DPLM-2 and ESM3) and propose advanced designs for better structure modeling. We have released the finer-grained bit-based generative modeling (`DPLM-2 Bit`). The full implementation of the paper will be released soon.
 
 ## Key Features 🔑
@@ -31,7 +31,7 @@ We develop DPLM based on the [ByProt](https://github.com/BytedProtein/ByProt). T
 
 **TODOs**
 
-- [ ] Controllable/guided generation with discrete diffusion classifier guidance. 
+- [ ] Controllable/guided generation with discrete diffusion classifier guidance.
 - [ ] Representation learning of DPLM-2
 
 
@@ -194,7 +194,7 @@ bash scripts/download_uniref50_hf.sh
 <!-- omit in toc -->
 #### Example of training
 
-We train DPLM with approximately 1 million tokens per batch for 100,000 training steps. 
+We train DPLM with approximately 1 million tokens per batch for 100,000 training steps.
 
 The following command is run on one node with 8 A100 GPUs. If you want to train on multiple nodes, you can adjust the total number of tokens by ensuring that `max_tokens` \* `accumulate_grad_batches`\*`#GPUs` is approximately 1 million.
 
@@ -214,7 +214,7 @@ python train.py \
     trainer.accumulate_grad_batches=${accumulate_grad_batches}
 ```
 
-You can adjust the other training configurations in the `configs/experiment/dplm/dplm_650m.yaml` as needed. 
+You can adjust the other training configurations in the `configs/experiment/dplm/dplm_650m.yaml` as needed.
 
 <!-- omit in toc -->
 ### DPLM-2
@@ -253,7 +253,7 @@ python train.py \
 
 In our latest work [DPLM-2.1](https://arxiv.org/abs/2504.11454), we show that the index-based structure token is challenging for the model to predict. A finer-grained, bit-based modeling approach in the latent space (i.e., predicting each bit of the quantized structure feature instead of the index) leads to better structural modeling and generation performance.
 
-The training dataset is same to DPLM-2, and the training command is as below: 
+The training dataset is same to DPLM-2, and the training command is as below:
 ```bash
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
@@ -289,14 +289,14 @@ To generate new protein sequences using a pre-trained DPLM model:
 
 ```bash
 model_name=dplm_650m # choose from dplm_150m, dplm_650m, dplm_3b
-output_dir=generation-results/${model_name}
+output_dir=generation-results/${model_name}/uncond_generation
 
 mkdir -p generation-results
 
 python generate_dplm.py --model_name airkingbd/${model_name} \
 	--seq_lens 100 200 300 400 500 \
 	--saveto ${output_dir}
-	
+
 # Evaluation
 bash anylasis/plddt_compute.sh ${output_dir} # compute pLDDT using ESMFold
 ```
@@ -315,7 +315,7 @@ User can co-generate sequence and structure simultaneously with the command belo
 
 ```bash
 # choose from dplm2_150m, dplm2_650m, dplm2_3b
-model_name=dplm2_650m 
+model_name=dplm2_650m
 sampling_strategy=annealing@2.0:1.0
 
 output_dir=generation-results/${model_name}
@@ -335,13 +335,13 @@ python generate_dplm2.py \
 # Evaluation
 input_fasta_dir=${output_dir}/co_generation
 python src/byprot/utils/protein/evaluator_dplm2.py -cn unconditional_codesign \
-    inference.input_fasta_dir=${input_fasta_dir}  
+    inference.input_fasta_dir=${input_fasta_dir}
 ```
 User can use `analysis/plot.ipynb` to plot the rmsd, tmscore distribution and diversity of each length.
 
 Co-generate sequence and structure with dplm-2 bit modeling variant:
 ```bash
-model_name=dplm2_bit_650m 
+model_name=dplm2_bit_650m
 sampling_strategy=annealing@1.1:0.1
 
 output_dir=generation-results/${model_name}
@@ -378,7 +378,7 @@ The folding generation and evaluation script is as follows.
 We utilize RMSD and TMscore between the predicted and ground truth structures for evaluation. DPLM-2 adopts argmax decoding for 100 sampling iterations.
 
 ```bash
-model_name=dplm2_650m 
+model_name=dplm2_650m
 output_dir=generation-results/${model_name}
 task=folding
 
@@ -396,7 +396,7 @@ python generate_dplm2.py \
 
 # Evaluation
 input_fasta_dir=${output_dir}/folding
-python src/byprot/utils/protein/evaluator_dplm2.py -cn forward_folding inference.input_fasta_dir=${input_fasta_dir} 
+python src/byprot/utils/protein/evaluator_dplm2.py -cn forward_folding inference.input_fasta_dir=${input_fasta_dir}
 ```
 
 For structure prediction conditioned on other customized sequences, users can input a FASTA file and modify the `input_fasta_path` variable to generate the predicted structure.
@@ -423,7 +423,7 @@ Partial results on the CATH 4.3 dataset are shown in the table below. For more d
 **Download the preproceesd CATH datasets**
 
 - CATH 4.2 dataset provided by [Generative Models for Graph-Based Protein Design (Ingraham et al, NeurIPS'19)](https://papers.nips.cc/paper/2019/hash/f3a4ff4839c56a5f460c88cce3666a2b-Abstract.html)
-- CATH 4.3 dataset provided by [Learning inverse folding from millions of predicted structures (Hsu et al, ICML'22)](https://www.biorxiv.org/content/10.1101/2022.04.10.487779v1) 
+- CATH 4.3 dataset provided by [Learning inverse folding from millions of predicted structures (Hsu et al, ICML'22)](https://www.biorxiv.org/content/10.1101/2022.04.10.487779v1)
 
 ```bash
 bash scripts/download_cath.sh
@@ -431,16 +431,16 @@ bash scripts/download_cath.sh
 <!-- omit in toc -->
 #### Training
 
-We train structure-conditional DPLM based on the [LM-Design](https://github.com/BytedProtein/ByProt) framework, designating the pre-trained protein language model as DPLM. The training script is as below. 
+We train structure-conditional DPLM based on the [LM-Design](https://github.com/BytedProtein/ByProt) framework, designating the pre-trained protein language model as DPLM. The training script is as below.
 
 ```bash
 exp=dplm/dplm_650m_invfold
 dataset=cath_4.3
-name=${dataset}/dplm_650m_invfold
+name=${dataset}/dplm_650m/invfold
 
 python train.py \
     experiment=${exp} datamodule=${dataset} name=${name} \
-    logger=tensorboard trainer=ddp_fp16 
+    logger=tensorboard trainer=ddp_fp16
 ```
 
 <!-- omit in toc -->
@@ -450,13 +450,13 @@ Users can set the `eval_sc` to `true` to calculate the self-consistency TMscore 
 
 ```bash
 dataset=cath_4.3
-exp_path=${dataset}/dplm_650m_invfold
-eval_sc=false 
-# if set ${eval_sc} to true, the program will calculate the self-consistency 
-# TMscore and pLDDT during generation, 
+exp_path=${dataset}/dplm_650m/invfold
+eval_sc=false
+# if set ${eval_sc} to true, the program will calculate the self-consistency
+# TMscore and pLDDT during generation,
 # thus siginificantly increase the evaluation time.
 
-python test.py \                                                                 
+python test.py \
     experiment_path=${exp_path} \
     data_split=test ckpt_path=best.ckpt mode=predict \
     task.generator.max_iter=100 task.generator.eval_sc=${eval_sc}
@@ -468,7 +468,7 @@ We provide the CAMEO 2022 and PDB date test set split used in our paper, where t
 User can use the following script to do the inverse folding and evaluation.
 
 ```bash
-model_name=dplm2_650m 
+model_name=dplm2_650m
 output_dir=generation-results/${model_name}
 task=inverse_folding
 
@@ -486,14 +486,14 @@ python generate_dplm2.py \
 
 # Evaluation
 input_fasta_dir=${output_dir}/inverse_folding
-python src/byprot/utils/protein/evaluator_dplm2.py -cn inverse_folding inference.input_fasta_dir=${input_fasta_dir} 
+python src/byprot/utils/protein/evaluator_dplm2.py -cn inverse_folding inference.input_fasta_dir=${input_fasta_dir}
 ```
 For any customized input structure, user can first tokenize the structure with structure tokenizer and save it to a FASTA file using the following script:
 ```bash
 # Tokenize
 # each protein is represented by a pdb file
 input_pdb_folder=/path/to/your/input/structure
-# this will save two fasta files in the ${input_pdb_folder}/tokenized_protein folder: 
+# this will save two fasta files in the ${input_pdb_folder}/tokenized_protein folder:
 # 1) struct.fasta, containing the tokenized structure tokens
 # 2) aatype.fasta, containing the amino acid tokens.
 python src/byprot/utils/protein/tokenize_pdb.py --input_pdb_folder ${input_pdb_folder} --output_dir ${input_pdb_folder}/tokenized_protein
@@ -505,7 +505,7 @@ DPLM and DPLM-2 can both perform motif scaffolding. DPLM can condition on the mo
 
 We examine on the benchmark, provided by [FrameFlow](https://github.com/microsoft/protein-frame-flow/blob/main/motif_scaffolding/benchmark.csv). For each motif-scaffolding problem, we sample 100 sequences and then calculate the success rate according to two aspects: motif part consistency and overall quality. For motif part consistency, we use the motif-RMSD < 1$\AA$ as the success criterion. For overall quality, the assessment varies across different approaches: sequence-based method (DPLM) we use pLDDT > 70, while for co-generation method (DPLM-2) we use scTM > 0.8. For more details, please refer to our paper.
 
-The success rate of each motif-scaffold problem is shown below. 
+The success rate of each motif-scaffold problem is shown below.
 
 |  | Pass rate | Avg. Success rate | 1BCF | 1PRW | 1QJG | 1YCR | 2KL8 | 3IXT | 4JHW | 4ZYP | 5IUS | 5TPN | 5TRV_long | 5TRV_med | 5TRV_short | 5WN9 | 5YUI | 6E6R_long | 6E6R_med | 6E6R_short | 6EXZ_long | 6EXZ_med | 6EXZ_short | 7MRX_long | 7MRX_med | 7MRX_short |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -522,12 +522,12 @@ We provide the following script to sample sequences for each motif-scaffolding p
 export CUDA_VISIBLE_DEVICES=0
 
 model_name=dplm_650m
-output_dir=./generation-results/${model_name}_motif_scaffolding
+output_dir=./generation-results/${model_name}/motif_scaffold
 
 mkdir -p generation-results
 
-# Generate scaffold 
-python scaffold_generate_dplm.py \
+# Generate scaffold
+python run/scaffold_generate_dplm.py \
     --model_name airkingbd/${model_name} \
     --num_seqs 100 \
     --saveto $output_dir
@@ -555,12 +555,12 @@ We provide the tokenized structure tokens and amino acid tokens of the motif in 
 export CUDA_VISIBLE_DEVICES=0
 
 model_name=dplm2_650m
-output_dir=./generation-results/${model_name}_motif_scaffolding
+output_dir=./generation-results/${model_name}/motif_scaffold
 
 mkdir -p generation-results
 
-# Generate scaffold 
-python scaffold_generate_dplm2.py \
+# Generate scaffold
+python run/scaffold_generate_dplm2.py \
     --model_name airkingbd/${model_name} \
     --num_seqs 100 \
     --saveto ${output_dir}
@@ -629,4 +629,3 @@ We express our sincere appreciation to the authors of these repositories for the
   year={2025}
 }
 ```
-

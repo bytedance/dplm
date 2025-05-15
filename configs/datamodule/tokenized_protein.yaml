@@ -1,0 +1,15 @@
+_target_: tokenized_protein
+
+data_dir: ${paths.data_dir} 
+# dataloader related
+max_tokens: 6000
+max_len: 1022
+num_workers: 8
+csv_file: pdb_swissprot
+vocab_file: airkingbd/dplm2_650m # or a vocab.txt file from local
+
+length_crop: true
+cluster_training: false
+min_crop_length: 60
+
+struct_vocab_size: 8192

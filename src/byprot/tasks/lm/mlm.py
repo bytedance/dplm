@@ -1,3 +1,7 @@
+# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
+# SPDX-License-Identifier: Apache-2.0
+
+
 import copy
 import os
 from typing import Any, Callable, List, Union
@@ -14,7 +18,7 @@ from omegaconf import DictConfig
 from torch import nn
 from torch.nn import functional as F
 from torchmetrics import CatMetric, MaxMetric, MeanMetric, MinMetric, SumMetric
-from byprot.models.lm.model_utils import get_net
+from byprot.models.utils import get_net
 
 log = utils.get_logger(__name__)
 

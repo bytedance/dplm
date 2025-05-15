@@ -1,0 +1,39 @@
+# This config is highly inspired by the MultiFlow (https://github.com/jasonkyuyim/multiflow) repo.
+
+
+env:
+  PROJECT_ROOT: /root/research/projects/ByProt
+
+inference:
+  predict_dir: .local/inference_outputs/
+  inference_subdir: run_${now:%Y-%m-%d}_${now:%H-%M-%S}
+  seed: 123
+  use_gpu: True
+  num_gpus: 1
+
+  metadata:
+    data_dir: ./data-bin
+    csv_path: ${.data_dir}/metadata/pdb_afdb_cameo.csv
+
+  task: unconditional
+  input_fasta_dir: /path/to/fasta/dir
+
+  compute_metrics: true #false
+  no_self_consistency: false
+  also_fold_pmpnn_seq: True # whether to also fold the generated pmpnn seq for each structure
+  write_sample_trajectories: False # whether to also save the trajectory of the generation process
+  calculate_diversity: True # whether to calculate the diversity of the generated structures
+
+  # Directory of software, weights, and outputs.  
+  pmpnn_dir: vendor/ProteinMPNN
+
+  folding:
+    seq_per_sample: 1
+    folding_model: esmf
+    own_device: False
+    pmpnn_path: ${..pmpnn_dir}
+    pt_hub_dir: null #./.cache/torch/
+    colabfold_path: path/to/colabfold-conda/bin/colabfold_batch # for AF2
+
+  struct_tokenizer:
+    exp_path: airkingbd/struct_tokenizer

@@ -4,7 +4,7 @@ lightning==2.2.0
 torchmetrics
 torch_geometric
 # torch_scatter
-torchtext==0.16.0
+torchtext==0.17.0
 
 # --------- hydra --------- #
 hydra-core==1.2.0

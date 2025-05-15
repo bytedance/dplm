@@ -23,6 +23,7 @@ import sys,os
 import argparse
 import logging
 import sys
+import glob
 import typing as T
 from pathlib import Path
 from timeit import default_timer as timer
@@ -139,7 +140,7 @@ def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-i",
-        "--fasta",
+        "--fasta_dir",
         help="Path directory to input FASTA file",
         type=Path,
         required=True,
@@ -148,10 +149,7 @@ def create_parser():
                 'touchhigh_various_length_all',
     )
     parser.add_argument(
-        "-o", "--pdb", help="Path directory to output PDB directory", type=Path, required=True,
-        default='ROOTDIR/' + \
-                'generation-results/' + \
-                'touchhigh_various_length_all/esmfold_pdb',
+        "-o", "--pdb", help="Path directory to output PDB directory", type=Path, default=None,
     )
     parser.add_argument(
         "-m", "--model-dir", help="Parent path to Pretrained ESM data directory. ", type=Path, default=None
@@ -185,7 +183,7 @@ def create_parser():
 
 
 def run(args):
-    args.pdb.mkdir(exist_ok=True)
+    # args.pdb.mkdir(exist_ok=True)
 
     logger.info("Loading model")
 
@@ -209,17 +207,16 @@ def run(args):
         model.cuda()
 
 
-    fasta_list = os.listdir(args.fasta)
-    for fasta in fasta_list:
-        if os.path.isdir(os.path.join(args.fasta, fasta)):
-            continue
+    for fasta in glob.glob(f"{args.fasta_dir}/**/*.fasta"):
         print(fasta)
-        pdbdir = os.path.join(args.pdb, fasta[:-6])
+        if args.pdb is not None:
+            pdbdir = os.path.join(args.pdb, fasta[:-6])
+        else:
+            pdbdir = os.path.join(os.path.dirname(fasta), "esmfold_pdb")
         Path(pdbdir).mkdir(exist_ok=True)
         # Read fasta and sort sequences by length
         logger.info(f"Reading sequences from {fasta}")
-        fasta_path = os.path.join(args.fasta, fasta)
-        all_sequences = sorted(read_fasta(fasta_path), key=lambda header_seq: len(header_seq[1]))
+        all_sequences = sorted(read_fasta(fasta), key=lambda header_seq: len(header_seq[1]))
         logger.info(f"Loaded {len(all_sequences)} sequences from {fasta}")
         logger.info("Starting Predictions")
         batched_sequences = create_batched_sequence_datasest(all_sequences, args.max_tokens_per_batch)

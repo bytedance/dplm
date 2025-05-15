@@ -1,8 +1,3 @@
-
-# Copyright (c) 2024 Bytedance Ltd. and/or its affiliates
-# SPDX-License-Identifier: Apache-2.0
-
-
 from typing import Dict, List, Union
 
 from pytorch_lightning.strategies import StrategyRegistry
@@ -20,7 +15,6 @@ from pytorch_lightning.utilities.rank_zero import rank_zero_warn
 from torch.optim import Optimizer
 import logging
 
-#from byprot.models.lm.esm_hf_flashattn import ModifiedEsmLayer
 
 log = logging.getLogger(__name__)
 

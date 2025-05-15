@@ -6,5 +6,3 @@ data_dir: ${paths.data_dir}/uniref50
 max_tokens: 6000
 max_len: 1022
 num_workers: 8
-
-mini_run: false

@@ -3,16 +3,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import copy
-import os
-from typing import Any, Callable, List, Union
+from typing import Any, Union
 
-import numpy as np
 import torch
 from byprot import utils
-from byprot.modules import metrics
 from byprot.tasks import TaskLitModule, register_task
-from byprot.utils.config import compose_config as Cfg, merge_config
+from byprot.utils.config import compose_config as Cfg
 from lightning.pytorch.utilities import grad_norm
 
 from omegaconf import DictConfig

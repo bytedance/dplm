@@ -1,0 +1,104 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - /datamodule: tokenized_protein
+  - /callbacks: lm
+  - /trainer: ddp_bf16
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+# name of the run determines folder name in logs
+project: "DPLM2_150m"
+name: "dplm2_150m"
+
+datamodule:
+  csv_file: pdb_swissprot
+  struct_vocab_size: 8192
+  max_tokens: 4000
+  max_len: 512
+  
+
+model:
+  _target_: dplm2
+  num_diffusion_timesteps: 500
+  gradient_ckpt: false
+  vocab_size: ${datamodule.struct_vocab_size}
+  freeze_backbone: false
+  training_stage: train_from_dplm
+  single_modality_ratio: 0.25
+  folding_loss_ratio: 0.25
+  inverse_folding_loss_ratio: 0.25
+  joint_loss_ratio: 0.25
+  independent_loss_ratio: 0.0
+  lora:
+    lora: true
+    lora_rank: 16
+    lora_dropout: 0.1
+    lora_target_module: (esm.encoder.layer.[0-9]*.attention.(self.query|self.key|self.value|output.dense).*|esm.encoder.layer.[0-9]*.(intermediate|output).dense.*)
+    modules_to_save: lm_head,esm.embeddings
+  net:
+    arch_type: esm
+    name: airkingbd/dplm_150m
+    dropout: 0.1
+    pretrain: true
+    pretrained_model_name_or_path: airkingbd/dplm_150m
+  self_mixup:
+    enable: false
+    with_original_loss: false
+  tokenizer:
+    vocab_file: ${datamodule.data_dir}/${datamodule.csv_file}/vocab_aa_struct.txt
+  struct_tokenizer:
+    exp_path: airkingbd/struct_tokenizer
+
+task:
+  _target_: lm/dplm2
+  learning:
+    watch_t1_t2_loss: false
+    cal_constant_loss: true
+    weight: linear
+  criterion:
+    _target_: byprot.modules.cross_entropy.StructAARDMCrossEntropyLoss
+    label_smoothing: 0.0
+    ignore_index: 1
+  optimizer:
+    type: adamw
+    _partial_: true
+    lr: ${train.lr}
+    betas: 
+      - 0.9
+      - 0.98
+    weight_decay: 0.01 # 0.0001
+  lr_scheduler:
+    type: polynomial
+    warmup_steps: 2000
+    total_steps: ${trainer.max_steps}
+    lr: ${train.lr}
+    lr_end: 1e-5
+    warmup_init_lr: 1e-07
+    power: 1
+
+train:
+  seed: 42
+  lr: 1e-4
+  monitor: "val/loss"
+  mode: "min"
+  patience: 1000
+
+trainer:
+  min_epochs: 10
+  max_epochs: 10000
+  gradient_clip_val: 0.5
+  # val_check_interval: 10
+  num_sanity_val_steps: 1
+  reload_dataloaders_every_n_epochs: 1
+  use_distributed_sampler: false
+  max_steps: 100_000
+  accumulate_grad_batches: 1
+  check_val_every_n_epoch: null
+  val_check_interval: 500
+  enable_progress_bar: true
+  num_nodes: 1

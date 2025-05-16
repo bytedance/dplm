@@ -62,7 +62,7 @@ We develop DPLM based on the [ByProt](https://github.com/BytedProtein/ByProt). T
   - [Training](#training)
   - [Unconditional protein (co-)generation](#unconditional-protein-co-generation)
     - [Protein sequence generation (DPLM)](#protein-sequence-generation-dplm)
-    - [Protein sequence-structure co-generation (DPLM-2)](#protein-sequence-structure-co-generation-dplm-2)
+    - [Protein sequence-structure co-generation (DPLM-2 & DPLM-2-Bit)](#protein-sequence-structure-co-generation-dplm-2--dplm-2-bit)
   - [Sequence-conditioned Generation: Forward Folding](#sequence-conditioned-generation-forward-folding)
   - [Structure-conditioned generation: inverse folding](#structure-conditioned-generation-inverse-folding)
   - [Motif scaffolding](#motif-scaffolding)
@@ -362,7 +362,7 @@ python generate_dplm2.py \
 
 ## Sequence-conditioned Generation: Forward Folding
 DPLM-2 spontaneously enables protein structure prediction given sequence (i.e., folding) in a zero-shot manner.
-We use the [CAMEO 2022 (provided by EigenFold)](https://github.com/bjing2016/EigenFold) and a [PDB date split (provided by MultiFlow)](https://github.com/jasonkyuyim/multiflow) as testsets, and we provide our preprocessed dataset in this [link](https://zenodo.org/records/15397663), and can be downloaded by:
+We use the [CAMEO 2022 (provided by EigenFold)](https://github.com/bjing2016/EigenFold) and a [PDB date split (provided by MultiFlow)](https://github.com/jasonkyuyim/multiflow) as testsets, and we provide our preprocessed dataset in this [link](https://zenodo.org/records/15424801), and can be downloaded by:
 ```bash
 bash script/download_metadata.sh
 ```
@@ -503,7 +503,11 @@ Then user can specify the path of generated `struct.fasta` as input and predict 
 ## Motif scaffolding
 DPLM and DPLM-2 can both perform motif scaffolding. DPLM can condition on the motif sequence and predict the scaffold sequence. DPLM-2 is able to condition on both the sequence and structure of the motif and simultaneously co-generate the sequence and structure of the scaffold part, which leads to better performance.
 
-We examine on the benchmark, provided by [FrameFlow](https://github.com/microsoft/protein-frame-flow/blob/main/motif_scaffolding/benchmark.csv). For each motif-scaffolding problem, we sample 100 sequences and then calculate the success rate according to two aspects: motif part consistency and overall quality. For motif part consistency, we use the motif-RMSD < 1$\AA$ as the success criterion. For overall quality, the assessment varies across different approaches: sequence-based method (DPLM) we use pLDDT > 70, while for co-generation method (DPLM-2) we use scTM > 0.8. For more details, please refer to our paper.
+We examine on the benchmark, provided by [FrameFlow](https://github.com/microsoft/protein-frame-flow/blob/main/motif_scaffolding/benchmark.csv). We use the motif pdb files which are provided by [EvoDiff](https://github.com/microsoft/evodiff/tree/main/examples/scaffolding-pdbs), and we also provide the pdbs and the corresponding structure tokens in this [link](https://zenodo.org/records/15424801). You can download the dataset by
+```bash
+bash scripts/download_motif_scaffolds.sh
+```
+For each motif-scaffolding problem, we sample 100 sequences and then calculate the success rate according to two aspects: motif part consistency and overall quality. For motif part consistency, we use the motif-RMSD < 1$\AA$ as the success criterion. For overall quality, the assessment varies across different approaches: sequence-based method (DPLM) we use pLDDT > 70, while for co-generation method (DPLM-2) we use scTM > 0.8. For more details, please refer to our paper.
 
 The success rate of each motif-scaffold problem is shown below.
 
@@ -516,7 +520,7 @@ The success rate of each motif-scaffold problem is shown below.
 <!-- omit in toc -->
 ### DPLM
 
-We provide the following script to sample sequences for each motif-scaffolding problem. Note that before generation, you should download all the motif pdb files which are provided by [EvoDiff](https://github.com/microsoft/evodiff), and place them in the data-bin/scaffolding-pdbs folder.
+We provide the following script to sample sequences for each motif-scaffolding problem. Note that before generation, you should download the motif pdbs and place them in the `data-bin/scaffolding-pdbs` folder.
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0
@@ -550,7 +554,7 @@ For evaluation, users can use the `analysis/motif_analysis.ipynb` to obtain succ
 
 <!-- omit in toc -->
 ### DPLM-2
-We provide the tokenized structure tokens and amino acid tokens of the motif in a FASTA file in the `data-bin/scaffolding-pdbs` folder. Users can co-generate the scaffold sequence and structure, conditioning on the sequence and structure of the motif part.
+Before generation, the FASTA file of tokenized structure tokens and amino acid tokens of the motif should be in the `data-bin/scaffolding-pdbs` folder. Users can co-generate the scaffold sequence and structure, conditioning on the sequence and structure of the motif part.
 ```bash
 export CUDA_VISIBLE_DEVICES=0
 

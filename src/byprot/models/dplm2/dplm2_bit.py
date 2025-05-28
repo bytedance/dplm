@@ -146,93 +146,6 @@ class DPLM2Bit(DPLM2):
 
         return outputs
 
-    def construct_x_t(self, batch, struct_target, aatype_target):
-        bsz = struct_target.size(0)
-        # seperately add noise to struct and aa
-        struct_t = torch.randint(
-            1,
-            self.cfg.num_diffusion_timesteps + 1,
-            (bsz,),
-            device=struct_target.device,
-        )
-        aatype_t = torch.randint(
-            1,
-            self.cfg.num_diffusion_timesteps + 1,
-            (bsz,),
-            device=aatype_target.device,
-        )
-
-        assert (
-            self.cfg.single_modality_ratio
-            + self.cfg.folding_loss_ratio
-            + self.cfg.inverse_folding_loss_ratio
-            + self.cfg.joint_loss_ratio
-            + self.cfg.independent_loss_ratio
-            == 1.0
-        )
-
-        split_sizes = [
-            int(bsz * self.cfg.single_modality_ratio),
-            int(bsz * self.cfg.folding_loss_ratio),
-            int(bsz * self.cfg.inverse_folding_loss_ratio),
-            int(bsz * self.cfg.independent_loss_ratio),
-            int(bsz * self.cfg.joint_loss_ratio),
-        ]
-        split_sizes[-1] = bsz - sum(split_sizes[:-1])
-
-        rand_index = torch.randperm(bsz).type_as(struct_target)
-        int_index_list = torch.split(rand_index, split_sizes)
-
-        bool_index_list = []
-        for int_index in int_index_list:
-            bool_index = torch.zeros(bsz, dtype=torch.bool).to(
-                struct_target.device
-            )
-            bool_index[int_index] = True
-            bool_index_list.append(bool_index)
-
-        (
-            single_modality_index,
-            folding_index,
-            inverse_folding_index,
-            independent_index,
-            joint_index,
-        ) = bool_index_list
-
-        struct_t = struct_t.masked_fill(inverse_folding_index, 0)
-        struct_type_id = self.get_modality_type(struct_target)
-        struct_x_t, struct_t, struct_loss_mask = list(
-            self.q_sample(
-                struct_target,
-                struct_t,
-                struct_type_id,
-                maskable_mask=self.get_non_special_symbol_mask(struct_target),
-                plddt_mask=batch["plddt_mask"]
-                if "plddt_mask" in batch
-                else None,
-            ).values()
-        )
-        aatype_t = aatype_t.masked_fill(folding_index, 0)
-        aatype_t = aatype_t.masked_scatter(joint_index, struct_t[joint_index])
-        aa_type_id = self.get_modality_type(aatype_target)
-        aatype_x_t, aatype_t, aa_loss_mask = list(
-            self.q_sample(
-                aatype_target,
-                aatype_t,
-                aa_type_id,
-                maskable_mask=self.get_non_special_symbol_mask(aatype_target),
-                plddt_mask=batch["plddt_mask"]
-                if "plddt_mask" in batch
-                else None,
-            ).values()
-        )
-
-        return (
-            {"t": struct_t, "x_t": struct_x_t, "mask": struct_loss_mask},
-            {"t": aatype_t, "x_t": aatype_x_t, "mask": aa_loss_mask},
-            single_modality_index,
-        )
-
     def compute_loss(self, batch, weighting="linear"):
         struct_target = batch["struct_tokens"]["targets"]
         aatype_target = batch["aatype_tokens"]["targets"]
@@ -243,48 +156,26 @@ class DPLM2Bit(DPLM2):
             struct_noised,
             aatype_noised,
             single_modality_index,
-        ) = self.construct_x_t(batch, struct_target, aatype_target)
+        ) = self.construct_x_t(struct_target, aatype_target)
         x_t = torch.concat([struct_noised["x_t"], aatype_noised["x_t"]], dim=1)
         if self.cfg.self_mixup.enable:
-            # 1. first part: masked prediction
-            with torch.no_grad():
-                model_outputs = self.forward(
-                    input_ids=x_t, single_modality=single_modality_index
-                )
-                lm_logits = model_outputs["logits"]
-            # 2. mixup: alternate mask with model prediction and gt with masks
-            prev_input_ids = x_t
-            non_special_sym_mask = self.get_non_special_symbol_mask(
-                prev_input_ids
+            model_outputs, mixup_loss_mask = self.self_mixup(
+                x_t, single_modality_index, bsz, seq_len
             )
-            model_pred = torch.where(
-                non_special_sym_mask, lm_logits.argmax(dim=-1), prev_input_ids
-            )
-            mixup_input_ids = self._self_mixup(
-                input_ids=prev_input_ids,
-                model_pred=model_pred,
-                non_special_sym_mask=non_special_sym_mask,
-            )
-
-            # # 3. second part: denoising + masked prediction
-            model_outputs = self.forward(
-                input_ids=mixup_input_ids,
-                single_modality=single_modality_index,
-            )
-            aatype_logits = model_outputs["aatype_logits"]
-            struct_logits = model_outputs["struct_logits"].reshape(
-                bsz, seq_len, -1, 2
-            )
+            (
+                struct_noised["mask"],
+                aatype_noised["mask"],
+            ) = mixup_loss_mask.chunk(2, dim=1)
         else:
             model_outputs = self.forward(
                 input_ids=x_t,
                 single_modality=single_modality_index,
             )
-            aatype_logits = model_outputs["aatype_logits"]
-            struct_logits = model_outputs["struct_logits"].reshape(
-                bsz, seq_len, -1, 2
-            )
 
+        aatype_logits = model_outputs["aatype_logits"]
+        struct_logits = model_outputs["struct_logits"].reshape(
+            bsz, seq_len, -1, 2
+        )
         num_timesteps = self.cfg.num_diffusion_timesteps
         struct_weight = {
             "linear": (
@@ -328,13 +219,37 @@ class DPLM2Bit(DPLM2):
             },  # training loss weight
         )
 
-    def _self_mixup(self, input_ids, model_pred, non_special_sym_mask=None):
-        replace_mask = input_ids.eq(self.aa_mask_id) | input_ids.eq(
-            self.struct_mask_id
+    def self_mixup(self, x_t, single_modality_index, bsz, seq_len):
+        # 1. first part: masked prediction
+        with torch.no_grad():
+            model_outputs = self.forward(
+                input_ids=x_t, single_modality=single_modality_index
+            )
+            aatype_logits = model_outputs["aatype_logits"]
+            struct_logits = model_outputs["struct_logits"].reshape(
+                bsz, seq_len, -1, 2
+            )
+        # 2. mixup: alternate mask with model prediction and gt with masks
+        prev_input_ids = x_t
+        non_special_sym_mask = self.get_non_special_symbol_mask(prev_input_ids)
+        model_pred = torch.where(
+            non_special_sym_mask,
+            self.sample_from_logits(
+                aatype_logits, struct_logits, temperature=0.0
+            ),
+            prev_input_ids,
+        )
+        mixup_xt, mixup_loss_mask = self.get_mixup_xt(
+            input_ids=prev_input_ids,
+            model_pred=model_pred,
+            non_special_sym_mask=non_special_sym_mask,
         )
 
-        mixup_input_ids = torch.where(replace_mask, model_pred, input_ids)
-        return mixup_input_ids
+        # # 3. second part: denoising + masked prediction
+        model_outputs = self.forward(
+            input_ids=mixup_xt, single_modality=single_modality_index
+        )
+        return model_outputs, mixup_loss_mask
 
     def forward_decoder(
         self,

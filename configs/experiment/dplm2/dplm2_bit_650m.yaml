@@ -17,7 +17,7 @@ name: "dplm2_bit_650m"
 
 datamodule:
   data_dir: ${paths.data_dir}
-  csv_file: airkingbd/pdb_swissprot # huggingface url or local path of csv file
+  csv_file: pdb_swissprot # huggingface url or local path of csv file
   vocab_file: airkingbd/dplm2_650m # huggingface url or local path of vocab file
   struct_vocab_size: 8192
   max_tokens: 4000
@@ -34,7 +34,7 @@ model:
   joint_loss_ratio: 0.25
   independent_loss_ratio: 0.0
   lora:
-    lora: false
+    enable: false
     lora_rank: 16
     lora_dropout: 0.1
     lora_target_module: (esm.encoder.layer.[0-9]*.attention.(self.query|self.key|self.value|output.dense).*|esm.encoder.layer.[0-9]*.(intermediate|output).dense.*)

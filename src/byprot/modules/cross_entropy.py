@@ -241,3 +241,136 @@ class RDMCrossEntropyLoss(nn.CrossEntropyLoss):
             logging_output["weight_diff_t2_loss"] = t2_loss.data
 
         return loss, logging_output
+
+
+class StructAARDMCrossEntropyLoss(nn.CrossEntropyLoss):
+    def forward(
+        self,
+        scores_dict,
+        target_dict,
+        label_mask_dict=None,
+        weights_dict=None,
+        cal_constant_loss=False,
+        watch_t1_t2_loss=False,
+    ) -> Tensor:
+        """
+        scores: [N, L, C], unnormalized scores
+        target: [N, L]
+        coord_mask: FloatTensor [N, L], where elements with `True` are allowed and `False` are masked-out
+        """
+        losses = 0
+        nll_losses = 0
+        logging_output_dict = {}
+
+        def compute(scores, target, label_mask, weights, key=""):
+            if len(key) > 0:
+                key = f"{key}/"
+            bsz, num_classes = scores.shape[0], scores.shape[-1]
+            n_tokens = target.numel()
+            if self.ignore_index is not None:
+                sample_size = n_nonpad_tokens = (
+                    target.ne(self.ignore_index).float().sum()
+                )
+            else:
+                sample_size = n_nonpad_tokens = n_tokens
+            # [N, L]
+            loss, nll_loss = label_smoothed_nll_loss(
+                lprobs=F.log_softmax(scores, dim=-1),
+                target=target,
+                epsilon=self.label_smoothing,
+                ignore_index=self.ignore_index,
+                reduce=False,
+            )
+            if weights is not None:
+                loss, nll_loss = loss * weights, nll_loss * weights
+            fullseq_loss = loss.sum() / sample_size
+            fullseq_nll_loss = nll_loss.sum() / sample_size
+
+            t1_loss, t2_loss = None, None
+            if watch_t1_t2_loss:
+                t1_loss, t2_loss = loss.chunk(2)
+                t1_mask, t2_mask = label_mask.chunk(2)
+                t1_loss = (t1_loss * t1_mask).sum() / (t1_mask.sum())
+                t2_loss = (t2_loss * t2_mask).sum() / (t2_mask.sum())
+
+            # use coord masked loss for model training,
+            # ignoring those position with missing coords (as nan)
+
+            if label_mask is not None:
+                label_mask = label_mask.float()
+                sample_size = max(1, label_mask.sum())
+                if len(label_mask.shape) == (len(loss.shape) - 1):
+                    # if bit-based modeling,
+                    # the loss is in B x L x 13 and label_mask is in B x L
+                    label_mask = label_mask[..., None].expand(loss.shape)
+                loss = (loss * label_mask).sum() / sample_size
+                nll_loss = (nll_loss * label_mask).sum() / sample_size
+            else:
+                loss, nll_loss = fullseq_loss, fullseq_nll_loss
+
+            ppl = torch.exp(nll_loss)
+
+            logging_output = {
+                f"{key}nll_loss": nll_loss.data,
+                f"{key}ppl": ppl.data,
+                f"{key}fullseq_loss": fullseq_loss.data,
+                f"{key}fullseq_nll_loss": fullseq_nll_loss.data,
+                f"{key}bsz": bsz,
+                f"{key}sample_size": sample_size,
+                f"{key}sample_ratio": sample_size / n_tokens,
+                f"{key}nonpad_ratio": n_nonpad_tokens / n_tokens,
+                f"{key}weight_diff_loss": loss.data,
+            }
+
+            if cal_constant_loss:
+                constant_weights = weights.new_ones(size=weights.size())
+                constant_loss, _ = label_smoothed_nll_loss(
+                    lprobs=F.log_softmax(scores, dim=-1),
+                    target=target,
+                    epsilon=self.label_smoothing,
+                    ignore_index=self.ignore_index,
+                    reduce=False,
+                )
+                constant_loss = constant_loss * constant_weights
+                constant_loss = (
+                    constant_loss * label_mask
+                ).sum() / sample_size
+                logging_output[f"{key}constant_diff_loss"] = constant_loss.data
+
+            if watch_t1_t2_loss:
+                logging_output[f"{key}weight_diff_t1_loss"] = t1_loss.data
+                logging_output[f"{key}weight_diff_t2_loss"] = t2_loss.data
+
+            return loss, nll_loss, logging_output
+
+        if type(scores_dict) is not dict:
+            loss, nll_loss, logging_output = compute(
+                scores_dict, target_dict, label_mask_dict, weights_dict
+            )
+            return loss, logging_output
+        else:
+            for k, scores in scores_dict.items():
+                loss, nll_loss, logging_output = compute(
+                    scores,
+                    target_dict[k],
+                    label_mask_dict[k],
+                    weights_dict[k],
+                    k,
+                )
+                losses += loss
+                nll_losses += nll_loss
+                logging_output_dict.update(logging_output)
+            logging_output_dict["sample_size"] = logging_output[
+                f"{k}/sample_size"
+            ]
+            logging_output_dict["nll_loss"] = nll_losses / len(
+                scores_dict.keys()
+            )
+            logging_output_dict["fullseq_loss"] = logging_output[
+                f"{k}/fullseq_loss"
+            ]
+            logging_output_dict["fullseq_nll_loss"] = logging_output[
+                f"{k}/fullseq_nll_loss"
+            ]
+            logging_output_dict["ppl"] = logging_output[f"{k}/ppl"]
+            return losses / len(scores_dict.keys()), logging_output_dict

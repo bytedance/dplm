@@ -34,7 +34,7 @@ model:
   joint_loss_ratio: 0.25
   independent_loss_ratio: 0.0
   lora:
-    lora: true
+    enable: true
     lora_rank: 16
     lora_dropout: 0.1
     lora_target_module: (esm.encoder.layer.[0-9]*.attention.(self.query|self.key|self.value|output.dense).*|esm.encoder.layer.[0-9]*.(intermediate|output).dense.*)

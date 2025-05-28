@@ -26,7 +26,7 @@ model:
     name: facebook/esm2_t30_150M_UR50D
     dropout: 0.0
   lora:
-    lora: false
+    enable: false
 
 task:
   _target_: lm/mlm

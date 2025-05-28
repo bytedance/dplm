@@ -32,7 +32,7 @@ class NetConfig:
 
 @dataclass
 class LoRAConfig:
-    lora: bool = field(default=False)
+    enable: bool = field(default=False)
     lora_rank: int = field(default=16)
     lora_dropout: float = field(default=0.1)
     lora_target_module: str = field(default="")

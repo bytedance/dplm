@@ -87,7 +87,7 @@ def get_net(cfg):
             del ptrn_net
 
     # activate lora training if possible
-    if cfg.lora.lora:
+    if cfg.lora.enable:
         # QKVO, MLP
         lora_target_module = cfg.lora.lora_target_module
         modules_to_save = cfg.lora.modules_to_save.split(",")
@@ -187,7 +187,7 @@ def get_net_dplm2(cfg):
         del pretrained_state_dict
 
     # activate lora training if possible
-    if cfg.lora.lora:
+    if cfg.lora.enable:
         # QKVO, MLP
         lora_target_module = cfg.lora.lora_target_module
         modules_to_save = cfg.lora.modules_to_save.split(",")
@@ -235,7 +235,7 @@ def get_net_dplm2_bit(cfg):
         del pretrained_state_dict
 
     # activate lora training if possible
-    if cfg.lora.lora:
+    if cfg.lora.enable:
         # QKVO, MLP
         lora_target_module = cfg.lora.lora_target_module.split(",")
         modules_to_save = cfg.lora.modules_to_save.split(",")

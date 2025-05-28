@@ -269,7 +269,32 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
         return outputs
 
-    def _self_mixup(self, input_ids, model_pred, non_special_sym_mask=None):
+    def self_mixup(self, x_t, single_modality_index):
+        # 1. first part: masked prediction
+        with torch.no_grad():
+            model_outputs = self.forward(
+                input_ids=x_t, single_modality=single_modality_index
+            )
+            lm_logits = model_outputs["logits"]
+        # 2. mixup: alternate mask with model prediction and gt with masks
+        prev_input_ids = x_t
+        non_special_sym_mask = self.get_non_special_symbol_mask(prev_input_ids)
+        model_pred = torch.where(
+            non_special_sym_mask, lm_logits.argmax(dim=-1), prev_input_ids
+        )
+        mixup_xt, mixup_loss_mask = self.get_mixup_xt(
+            input_ids=prev_input_ids,
+            model_pred=model_pred,
+            non_special_sym_mask=non_special_sym_mask,
+        )
+
+        # # 3. second part: denoising + masked prediction
+        model_outputs = self.forward(
+            input_ids=mixup_xt, single_modality=single_modality_index
+        )
+        return model_outputs, mixup_loss_mask
+
+    def get_mixup_xt(self, input_ids, model_pred, non_special_sym_mask=None):
         gt_mask = (
             input_ids.ne(self.aa_mask_id)
             & input_ids.ne(self.struct_mask_id)
@@ -377,30 +402,9 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
         ) = self.construct_x_t(struct_target, aatype_target)
         x_t = torch.concat([struct_noised["x_t"], aatype_noised["x_t"]], dim=1)
         if self.cfg.self_mixup.enable:
-            # 1. first part: masked prediction
-            with torch.no_grad():
-                model_outputs = self.forward(
-                    input_ids=x_t, single_modality=single_modality_index
-                )
-                lm_logits = model_outputs["logits"]
-            # 2. mixup: alternate mask with model prediction and gt with masks
-            prev_input_ids = x_t
-            non_special_sym_mask = self.get_non_special_symbol_mask(
-                prev_input_ids
-            )
-            model_pred = torch.where(
-                non_special_sym_mask, lm_logits.argmax(dim=-1), prev_input_ids
-            )
-            mixup_input_ids, mixup_loss_mask = self._self_mixup(
-                input_ids=prev_input_ids,
-                model_pred=model_pred,
-                non_special_sym_mask=non_special_sym_mask,
-            )
-
-            # # 3. second part: denoising + masked prediction
-            model_outputs = self.forward(
-                input_ids=mixup_input_ids,
-                single_modality=single_modality_index,
+            model_outputs, mixup_loss_mask = self.self_mixup(
+                x_t=x_t,
+                single_modality_index=single_modality_index,
             )
             (
                 struct_noised["mask"],

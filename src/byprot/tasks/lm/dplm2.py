@@ -19,11 +19,24 @@ from byprot.utils.config import merge_config
 log = utils.get_logger(__name__)
 
 
-def cal_index_acc(logits, target, loss_mask):
-    model_pred = logits.argmax(dim=-1)
-    index_match = (model_pred == target) & loss_mask
-    index_accuracy = index_match.sum() / loss_mask.sum()
-    return index_accuracy
+def cal_index_acc(logits, target, loss_mask, bit_level=False):
+    if not bit_level:
+        model_pred = logits.argmax(dim=-1)
+        index_match = (model_pred == target) & loss_mask
+        index_accuracy = index_match.sum() / loss_mask.sum()
+        return index_accuracy
+    else:
+        model_pred = logits.argmax(dim=-1)
+        label_mask_expand = loss_mask[..., None].expand(
+            model_pred.shape
+        )  # B x L x 13
+        total_bits = label_mask_expand.sum()
+        bitwise_match = (model_pred == target) & label_mask_expand
+        bitwise_accuracy = bitwise_match.sum() / total_bits
+        index_accuracy = (
+            bitwise_match.sum(dim=-1) == bitwise_match.shape[-1]
+        ).sum() / loss_mask.sum()
+        return index_accuracy, bitwise_accuracy
 
 
 @register_task("lm/dplm2")
@@ -121,14 +134,14 @@ class DPLM2TrainingTask(TaskLitModule):
         - tokens: LongTensor [bsz, len], sequence of amino acids
         """
         weighting = self.hparams.learning.weight
-        logits, target, loss_mask, weights = self.model.compute_loss(
+        logits, targets, loss_masks, weights = self.model.compute_loss(
             batch, weighting=weighting
         )
 
         loss, logging_output = self.criterion(
             logits,
-            target,
-            loss_mask,
+            targets,
+            loss_masks,
             weights,
             watch_t1_t2_loss=self.hparams.learning.watch_t1_t2_loss,
             cal_constant_loss=self.hparams.learning.cal_constant_loss,
@@ -136,11 +149,26 @@ class DPLM2TrainingTask(TaskLitModule):
 
         # calculate index accuracy
         logging_output["aatype/index_accuracy"] = cal_index_acc(
-            logits["aatype"], target["aatype"], loss_mask["aatype"]
+            logits["aatype"], targets["aatype"], loss_masks["aatype"]
         )
-        logging_output["struct/index_accuracy"] = cal_index_acc(
-            logits["struct"], target["struct"], loss_mask["struct"]
-        )
+        if len(loss_masks["struct"].shape) == (
+            len(targets["struct"].shape) - 1
+        ):
+            # if bit-based modeling,
+            # the loss is in B x L x 13 and label_mask is in B x L
+            (
+                logging_output["struct/index_accuracy"],
+                logging_output["struct/bit_accuracy"],
+            ) = cal_index_acc(
+                logits["struct"],
+                targets["struct"],
+                loss_masks["struct"],
+                bit_level=True,
+            )
+        else:
+            logging_output["struct/index_accuracy"] = cal_index_acc(
+                logits["struct"], targets["struct"], loss_masks["struct"]
+            )
 
         if torch.isnan(loss):
             print("Loss NAN on step ", self.global_step)

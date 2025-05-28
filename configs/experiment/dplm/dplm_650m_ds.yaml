@@ -25,7 +25,7 @@ model:
   gradient_ckpt: false
   rdm_couple: false
   lora:
-    lora: false
+    enable: false
     lora_rank: 16
     lora_dropout: 0.1
     lora_target_module: (esm.encoder.layer.[0-9]*.attention.(self.query|self.key|self.value|output.dense).*|esm.encoder.layer.[0-9]*.(intermediate|output).dense.*)

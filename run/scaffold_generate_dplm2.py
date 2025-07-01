@@ -52,80 +52,79 @@ def generate(args, saveto):
             device,
         )
 
-        for iteration in range(1, args.sampling_each_seq + 1):
-            output_tokens = torch.tensor([], device=device)
-            for batch in batches:
-                with torch.cuda.amp.autocast():
-                    outputs = model.generate(
-                        input_tokens=batch["input_ids"],
-                        max_iter=max_iter,
-                        sampling_strategy=args.sampling_strategy,
-                        partial_masks=batch["partial_mask"],
-                    )
-                output_tokens = torch.concat([output_tokens, outputs[0]])
-            assert output_tokens.shape[0] == len(start_idxs_list)
-            print("final:")
-            pprint(
-                [
-                    ",".join(seq.split(" "))
-                    for seq in tokenizer.batch_decode(
-                        output_tokens, skip_special_tokens=False
-                    )
-                ]
-            )
-
-            # save output
-            scaffold_fasta_path = os.path.join(saveto, "scaffold_fasta")
-            os.makedirs(scaffold_fasta_path, exist_ok=True)
-            scaffold_info_path = os.path.join(saveto, "scaffold_info")
-            os.makedirs(scaffold_info_path, exist_ok=True)
-
-            # save scaffold fasta
-            save_results(
-                output_tokens=output_tokens,
-                save_dir=os.path.join(scaffold_fasta_path, ori_pdb_name),
-                tokenizer=tokenizer,
-                struct_tokenizer=model.struct_tokenizer,
-                save_pdb=True,
-                continue_write=True,
-            )
-
-            # save scaffold info
-            struct_tokens, aa_tokens = output_tokens.chunk(2, dim=-1)
-            aa_strings = [
-                "".join(seq.split(" "))
-                for seq in tokenizer.batch_decode(
-                    aa_tokens, skip_special_tokens=True
-                )
-            ]
-            struct_strings = [
+        output_tokens = torch.tensor([], device=device)
+        for batch in batches:
+            with torch.cuda.amp.autocast():
+                outputs = model.generate(
+                    input_tokens=batch["input_ids"],
+                    max_iter=max_iter,
+                    sampling_strategy=args.sampling_strategy,
+                    partial_masks=batch["partial_mask"],
+                )["output_tokens"]
+            output_tokens = torch.concat([output_tokens, outputs])
+        assert output_tokens.shape[0] == len(start_idxs_list)
+        print("final:")
+        pprint(
+            [
                 ",".join(seq.split(" "))
                 for seq in tokenizer.batch_decode(
-                    struct_tokens, skip_special_tokens=True
+                    output_tokens, skip_special_tokens=False
                 )
             ]
-            save_df = pd.DataFrame(
-                list(
-                    zip(
-                        aa_strings,
-                        struct_strings,
-                        start_idxs_list,
-                        end_idxs_list,
-                        scaffold_lengths_list,
-                    )
-                ),
-                columns=[
-                    "aa_seqs",
-                    "struct_seqs",
-                    "start_idxs",
-                    "end_idxs",
-                    "scaffold_lengths",
-                ],
+        )
+
+        # save output
+        scaffold_fasta_path = os.path.join(saveto, "scaffold_fasta")
+        os.makedirs(scaffold_fasta_path, exist_ok=True)
+        scaffold_info_path = os.path.join(saveto, "scaffold_info")
+        os.makedirs(scaffold_info_path, exist_ok=True)
+
+        # save scaffold fasta
+        save_results(
+            output_tokens=output_tokens,
+            save_dir=os.path.join(scaffold_fasta_path, ori_pdb_name),
+            tokenizer=tokenizer,
+            struct_tokenizer=model.struct_tokenizer,
+            save_pdb=True,
+            continue_write=True,
+        )
+
+        # save scaffold info
+        struct_tokens, aa_tokens = output_tokens.chunk(2, dim=-1)
+        aa_strings = [
+            "".join(seq.split(" "))
+            for seq in tokenizer.batch_decode(
+                aa_tokens, skip_special_tokens=True
             )
-            save_df.to_csv(
-                os.path.join(scaffold_info_path, f"{ori_pdb_name}.csv"),
-                index=False,
+        ]
+        struct_strings = [
+            ",".join(seq.split(" "))
+            for seq in tokenizer.batch_decode(
+                struct_tokens, skip_special_tokens=True
             )
+        ]
+        save_df = pd.DataFrame(
+            list(
+                zip(
+                    aa_strings,
+                    struct_strings,
+                    start_idxs_list,
+                    end_idxs_list,
+                    scaffold_lengths_list,
+                )
+            ),
+            columns=[
+                "aa_seqs",
+                "struct_seqs",
+                "start_idxs",
+                "end_idxs",
+                "scaffold_lengths",
+            ],
+        )
+        save_df.to_csv(
+            os.path.join(scaffold_info_path, f"{ori_pdb_name}.csv"),
+            index=False,
+        )
 
 
 def save_results(
@@ -210,7 +209,7 @@ def main():
     parser.add_argument(
         "--motif_struct",
         type=str,
-        default=".data-bin/scaffolding-pdbs/struct_seq.fasta",
+        default="./data-bin/scaffolding-pdbs/struct_seq.fasta",
     )
 
     args = parser.parse_args()

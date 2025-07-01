@@ -112,21 +112,21 @@ total_length = {
     "1QJG": -1,
     "1YCR": [40, 100],
     "2KL8": -1,
-    "7MRX_60": [60, 61],
-    "7MRX_85": [85, 86],
-    "7MRX_128": [128, 129],
+    "7MRX_60": [60, 60],
+    "7MRX_85": [85, 85],
+    "7MRX_128": [128, 128],
     "4JHW": [60, 90],
     "4ZYP": [30, 50],
     "5WN9": [35, 50],
-    "5TRV_short": [56, 57],
-    "5TRV_med": [86, 87],
-    "5TRV_long": [116, 117],
-    "6E6R_short": [48, 49],
-    "6E6R_med": [78, 79],
-    "6E6R_long": [108, 109],
-    "6EXZ_short": [50, 51],
-    "6EXZ_med": [80, 81],
-    "6EXZ_long": [110, 111],
+    "5TRV_short": [56, 56],
+    "5TRV_med": [86, 86],
+    "5TRV_long": [116, 116],
+    "6E6R_short": [48, 48],
+    "6E6R_med": [78, 78],
+    "6E6R_long": [108, 108],
+    "6EXZ_short": [50, 50],
+    "6EXZ_med": [80, 80],
+    "6EXZ_long": [110, 110],
 }
 
 start_idx_dict = {
@@ -209,24 +209,20 @@ def get_intervals(list, single_res_domain=False):
     return start, stop
 
 
-def get_motif(pdb_name, ori_pdb_name, mask_token, spacer_list=None):
-    # Get motif of sequence from PDB file
-    start_idxs = start_idx_dict[pdb_name]
-    end_idxs = end_idx_dict[pdb_name]
-
+def get_motif_dplm(pdb, ori_pdb):
+    # Get motif of sequence from PDB code
+    start_idxs = start_idx_dict[pdb]
+    end_idxs = end_idx_dict[pdb]
     pdb_clean_path = os.path.join(
-        "data-bin/scaffolding-pdbs/" + str(pdb_name) + "_clean.pdb"
+        "data-bin/scaffolding-pdbs/" + str(pdb) + "_clean.pdb"
     )
-    chain = chain_dict[pdb_name]
+
+    chain = chain_dict[pdb]
     chain_ids = [chain]
     print("WARNING: USING CHAIN", chain, "FROM PDB FILE")
-    structure = esm.inverse_folding.util.load_structure(
-        pdb_clean_path, chain_ids
-    )
-    native_seqs = (
-        esm.inverse_folding.multichain_util.extract_coords_from_complex(
-            structure
-        )[1]
+    structure = esm.inverse_folding.util.load_structure(pdb_clean_path, chain_ids)
+    coords, native_seqs = (
+        esm.inverse_folding.multichain_util.extract_coords_from_complex(structure)
     )
     sequence = native_seqs[chain_ids[0]]
     print("sequence extracted from pdb", sequence)
@@ -234,27 +230,48 @@ def get_motif(pdb_name, ori_pdb_name, mask_token, spacer_list=None):
     assert len(start_idxs) == len(end_idxs)
     sequence = list(sequence)
 
-    if spacer_list is None:
-        spacer_list = []
     end_idxs = [i + 1 for i in end_idxs]  # inclusive of final residue
     if len(start_idxs) > 1:
         motif = []
         for i in range(len(start_idxs)):
             motif += sequence[start_idxs[i] : end_idxs[i]]
             if i < (len(start_idxs) - 1):
-                if spacer_list is None:
-                    interval_start = scaffold_interval[ori_pdb_name][i][0]
-                    interval_end = scaffold_interval[ori_pdb_name][i][1]
-                    spacer = random.randint(interval_start, interval_end)
-                    spacer_list.append(spacer)
-                else:
-                    spacer = spacer_list[i]
-                motif += [mask_token] * spacer
+                # spacer = start_idxs[i+1] - end_idxs[i]
+                interval_start = scaffold_interval[ori_pdb][i][0]
+                interval_end = scaffold_interval[ori_pdb][i][1]
+                spacer = random.randint(interval_start, interval_end)
+                motif += ["<mask>"] * spacer
     else:
         motif = sequence[start_idxs[0] : end_idxs[0]]
     print("motif extracted from indexes supplied:", "".join(motif))
 
-    return motif, spacer_list
+    return motif
+
+
+def get_motif_dplm2(pdb_name, ori_pdb_name, motif_seq, mask_token, spacer_list=None):
+    start_idxs = start_idx_dict[pdb_name]
+    end_idxs = end_idx_dict[pdb_name]
+    ret_spacer_list = []
+    assert len(start_idxs) == len(end_idxs)
+
+    end_idxs = [i + 1 for i in end_idxs]  # inclusive of final residue
+    if len(start_idxs) > 1:
+        motif = []
+        for i in range(len(start_idxs)):
+            motif += motif_seq[start_idxs[i] : end_idxs[i]]
+            if i < (len(start_idxs) - 1):
+                if spacer_list is None:
+                    interval_start = scaffold_interval[ori_pdb_name][i][0]
+                    interval_end = scaffold_interval[ori_pdb_name][i][1]
+                    spacer = random.randint(interval_start, interval_end)
+                    ret_spacer_list.append(spacer)
+                else:
+                    spacer = spacer_list[i]
+                motif += [mask_token] * spacer
+    else:
+        motif = motif_seq[start_idxs[0] : end_idxs[0]]
+    print("motif extracted from indexes supplied:", motif)
+    return motif, ret_spacer_list
 
 
 # ====================================================================
@@ -286,7 +303,7 @@ def prepare_data(pdb_path, alphabet, collator, num_seqs, device):
 
 def get_initial_dplm(args, tokenizer, pdb, ori_pdb, device):
     num = args.num_seqs
-    motif, _ = get_motif(pdb, ori_pdb, mask_token=tokenizer.mask_token)
+    motif = get_motif_dplm(pdb, ori_pdb)
 
     mask = tokenizer.mask_token_id
     bos = tokenizer.cls_token_id
@@ -303,11 +320,7 @@ def get_initial_dplm(args, tokenizer, pdb, ori_pdb, device):
                 scaffold_left[ori_pdb][0], scaffold_left[ori_pdb][1]
             )
 
-            motif = get_motif(
-                pdb_name=pdb,
-                ori_pdb_name=ori_pdb,
-                mask_token=tokenizer.mask_token,
-            )
+            motif = get_motif_dplm(pdb=pdb, ori_pdb=ori_pdb)
             motif_overall_length = len(motif)
 
             if total_length[ori_pdb] != -1:
@@ -341,28 +354,21 @@ def get_initial_dplm(args, tokenizer, pdb, ori_pdb, device):
                 )
 
             overall_length = (
-                scaffold_left_length
-                + motif_overall_length
-                + scaffold_right_length
+                scaffold_left_length + motif_overall_length + scaffold_right_length
             )
-            scaffold_length_list.append(
-                scaffold_left_length + scaffold_right_length
-            )
+            scaffold_length_list.append(scaffold_left_length + scaffold_right_length)
 
         seq = (
-            [tokenizer.mask_token] * scaffold_left_length
+            ["<mask>"] * scaffold_left_length
             + motif
-            + [tokenizer.mask_token] * scaffold_right_length
+            + ["<mask>"] * scaffold_right_length
         )
         assert len(seq) == overall_length
         seq = "".join(seq)
         init_seq.append(seq)
 
     batch = tokenizer.batch_encode_plus(
-        init_seq,
-        add_special_tokens=True,
-        padding="longest",
-        return_tensors="pt",
+        init_seq, add_special_tokens=True, padding="longest", return_tensors="pt"
     )
     batch = {
         "input_ids": batch["input_ids"],
@@ -390,11 +396,7 @@ def get_initial_dplm(args, tokenizer, pdb, ori_pdb, device):
 # ====================================================================
 # =================== For DPLM-2 motif-scaffolding ===================
 # ====================================================================
-
-
-def get_initial_dplm2(
-    args, aa_seq, struct_seq, tokenizer, pdb, ori_pdb, device
-):
+def get_initial_dplm2(args, aa_seq, struct_seq, tokenizer, pdb, ori_pdb, device):
     init_aa_seq, init_struct_seq, scaffold_length_list = create_init_seq(
         pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args
     )
@@ -402,9 +404,7 @@ def get_initial_dplm2(
     batch = collate(tokenizer, init_aa_seq, init_struct_seq, args, device)
     pprint(batch)
 
-    start_idxs_list, end_idxs_list = create_idxs_list(
-        pdb, tokenizer, batch, args
-    )
+    start_idxs_list, end_idxs_list = create_idxs_list(pdb, tokenizer, batch, args)
 
     batches = create_batches(batch, args)
 
@@ -431,9 +431,10 @@ def create_init_seq(pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args):
                 scaffold_left[ori_pdb][0], scaffold_left[ori_pdb][1]
             )
 
-            motif_aa_seq, spacer_list = get_motif(
+            motif_aa_seq, spacer_list = get_motif_dplm2(
                 pdb_name=pdb,
                 ori_pdb_name=ori_pdb,
+                motif_seq=aa_seq,
                 mask_token=aa_mask_token,
             )
             motif_overall_length = len(motif_aa_seq)
@@ -469,13 +470,9 @@ def create_init_seq(pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args):
                 )
 
             overall_length = (
-                scaffold_left_length
-                + motif_overall_length
-                + scaffold_right_length
+                scaffold_left_length + motif_overall_length + scaffold_right_length
             )
-            scaffold_length_list.append(
-                scaffold_left_length + scaffold_right_length
-            )
+            scaffold_length_list.append(scaffold_left_length + scaffold_right_length)
 
         ## motif aa seq initialization
         seq = (
@@ -487,16 +484,15 @@ def create_init_seq(pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args):
         )
         seq = "".join(seq)
         assert len(
-            tokenizer(seq, add_special_tokens=False, padding=False)[
-                "input_ids"
-            ]
+            tokenizer(seq, add_special_tokens=False, padding=False)["input_ids"]
         ) == (overall_length + 2)
         init_aa_seq.append(seq)
 
         ## motif struct seq initialization
-        motif_struct_seq, _ = get_motif(
+        motif_struct_seq, _ = get_motif_dplm2(
             pdb_name=pdb,
             ori_pdb_name=ori_pdb,
+            motif_seq=struct_seq,
             mask_token=struct_mask_token,
             spacer_list=spacer_list,
         )
@@ -509,9 +505,7 @@ def create_init_seq(pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args):
         )
         seq = "".join(seq)
         assert len(
-            tokenizer(seq, add_special_tokens=False, padding=False)[
-                "input_ids"
-            ]
+            tokenizer(seq, add_special_tokens=False, padding=False)["input_ids"]
         ) == (overall_length + 2)
         init_struct_seq.append(seq)
 
@@ -520,10 +514,7 @@ def create_init_seq(pdb, ori_pdb, aa_seq, struct_seq, tokenizer, args):
 
 def collate(tokenizer, init_aa_seq, init_struct_seq, args, device):
     batch_aa = tokenizer.batch_encode_plus(
-        init_aa_seq,
-        add_special_tokens=False,
-        padding="longest",
-        return_tensors="pt",
+        init_aa_seq, add_special_tokens=False, padding="longest", return_tensors="pt"
     )
     batch_aa = {
         "aa_ids": batch_aa["input_ids"],
@@ -565,9 +556,7 @@ def collate(tokenizer, init_aa_seq, init_struct_seq, args, device):
 
     # create partial mask
     aa_mask_idx = tokenizer.added_tokens_encoder[tokenizer.aa_mask_token]
-    struct_mask_idx = tokenizer.added_tokens_encoder[
-        tokenizer.struct_mask_token
-    ]
+    struct_mask_idx = tokenizer.added_tokens_encoder[tokenizer.struct_mask_token]
     partial_mask = (
         batch["input_ids"].ne(aa_mask_idx)
         & batch["input_ids"].ne(struct_mask_idx)

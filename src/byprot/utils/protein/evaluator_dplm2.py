@@ -257,7 +257,7 @@ class EvalRunner:
         directory_basename = os.path.basename(directory_path)
         output_dir = os.path.join(self.inference_dir, directory_basename)
         os.makedirs(output_dir, exist_ok=True)
-        os.system(f"ln -s {origin_dir} {output_dir}/pdb")
+        os.system(f"cp -r {origin_dir} {output_dir}/pdb")
         return f"{output_dir}/pdb"
 
     def write_trajectory(self, pdb_folder):
@@ -1157,7 +1157,7 @@ def run(cfg: DictConfig) -> None:
                 input_fasta_dir
                 + (
                     "/**/*.fasta"
-                    if cfg.inference.task == "unconditional"
+                    if cfg.inference.task.startswith("unconditional")
                     else "/*.fasta"
                 ),
                 recursive=False,

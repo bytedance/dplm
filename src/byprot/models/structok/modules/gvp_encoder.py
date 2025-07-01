@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+import esm
 import torch
 from torch import nn
 
@@ -38,10 +39,7 @@ class GVPTransformerEncoderWrapper(nn.Module):
         confidence = torch.ones(coords.shape[0:2]).to(coords.device)
         with torch.set_grad_enabled(not self.freeze):
             encoder_out = self.encoder(
-                coords,
-                padding_mask,
-                confidence,
-                return_all_hiddens=return_all_hiddens,
+                coords, padding_mask, confidence, return_all_hiddens=return_all_hiddens
             )
         # encoder_out['encoder_out'][0] = torch.transpose(encoder_out['encoder_out'][0], 0, 1)
         encoder_out["out"] = encoder_out["encoder_out"][0].transpose(0, 1)
@@ -80,10 +78,7 @@ class GVPTransformerEncoderWrapper2(nn.Module):
         # confidence = torch.ones(coords.shape[0:2]).to(coords.device)
         with torch.set_grad_enabled(not self.freeze):
             encoder_out = self.encoder(
-                coords,
-                padding_mask,
-                confidence,
-                return_all_hiddens=return_all_hiddens,
+                coords, padding_mask, confidence, return_all_hiddens=return_all_hiddens
             )
         # encoder_out['encoder_out'][0] = torch.transpose(encoder_out['encoder_out'][0], 0, 1)
         encoder_out["out"] = encoder_out["encoder_out"][0].transpose(0, 1)
@@ -92,20 +87,3 @@ class GVPTransformerEncoderWrapper2(nn.Module):
             logits = self.out_proj(encoder_out["feats"])
             encoder_out["logits"] = logits
         return encoder_out
-
-
-if __name__ == "__main__":
-
-    def get_sample_batch():
-        from byprot.datamodules.datasets import Alphabet, PDBDataProcessor
-
-        alphabet = Alphabet("esm", "cath")
-        structure = PDBDataProcessor().parse_PDB(
-            "/root/research/projects/ByProt/examples/5cw9.pdb"
-        )
-        return alphabet.featurize([structure] * 2)
-
-    batch = get_sample_batch()
-    encoder = GVPTransformerEncoderWrapper()
-    encoder_out = encoder(batch["coords"])
-    print(encoder_out)

@@ -177,7 +177,7 @@ class DiffusionProteinLanguageModel(nn.Module):
                     target,
                     t1,
                     t2,
-                    maskable_mask=self.get_non_special_sym_mask(target),
+                    maskable_mask=self.get_non_special_symbol_mask(target),
                 ).values()
             )
             target = target.repeat(2, 1)
@@ -186,7 +186,7 @@ class DiffusionProteinLanguageModel(nn.Module):
                 self.q_sample(
                     target,
                     t1,
-                    maskable_mask=self.get_non_special_sym_mask(target),
+                    maskable_mask=self.get_non_special_symbol_mask(target),
                 ).values()
             )
 
@@ -202,17 +202,15 @@ class DiffusionProteinLanguageModel(nn.Module):
 
         return logits, target, loss_mask, weight
 
-    def forward_encoder(self, batch, **kwargs):
+    def forward_encoder(self, input_tokens, **kwargs):
         return {}
 
-    def initialize_output_tokens(self, batch, partial_masks=None, **kwargs):
-        tokens = batch["input_ids"]
+    def initialize_output_tokens(self, input_tokens, partial_masks=None, **kwargs):
+        tokens = input_tokens
         if tokens is None:
             raise NotImplementedError
         else:
-            output_mask = self.get_non_special_sym_mask(
-                tokens, partial_masks=partial_masks
-            )
+            output_mask = self.get_non_special_symbol_mask(tokens, partial_masks=partial_masks)
 
             output_tokens = tokens.masked_fill(output_mask, self.mask_id)
             output_scores = torch.zeros_like(output_tokens, dtype=torch.float)
@@ -310,7 +308,7 @@ class DiffusionProteinLanguageModel(nn.Module):
         need_attn_weights=False,
         partial_masks=None,
         sampling_strategy="gumbel_argmax",
-        disable_resample=False,
+        disable_resample=True,
         resample_ratio=0.25,
     ):
         output_tokens = prev_decoder_out["output_tokens"].clone()
@@ -319,7 +317,7 @@ class DiffusionProteinLanguageModel(nn.Module):
         temperature = prev_decoder_out["temperature"]
         history = prev_decoder_out["history"]
 
-        output_masks = self.get_non_special_sym_mask(
+        output_masks = self.get_non_special_symbol_mask(
             output_tokens, partial_masks=partial_masks
         )
 
@@ -354,6 +352,7 @@ class DiffusionProteinLanguageModel(nn.Module):
             )
 
             if not disable_resample:
+                # rejection sampling for eliminating the repeat pattern in the sampled sequence
                 self.resample(
                     _tokens, _scores, ratio=resample_ratio, scale=1.0
                 )
@@ -375,7 +374,7 @@ class DiffusionProteinLanguageModel(nn.Module):
             hidden_states=net_out["last_hidden_state"],
         )
 
-    def get_non_special_sym_mask(self, output_tokens, partial_masks=None):
+    def get_non_special_symbol_mask(self, output_tokens, partial_masks=None):
         non_special_sym_mask = (
             output_tokens.ne(self.pad_id)
             & output_tokens.ne(self.bos_id)
@@ -503,7 +502,7 @@ class DiffusionProteinLanguageModel(nn.Module):
 
     def generate(
         self,
-        batch,
+        input_tokens,
         tokenizer=None,
         max_iter=None,
         temperature=None,
@@ -517,13 +516,13 @@ class DiffusionProteinLanguageModel(nn.Module):
         temperature = temperature
 
         # 0) encoding
-        encoder_out = self.forward_encoder(batch)
+        encoder_out = self.forward_encoder(input_tokens)
         # 1) initialized from all mask tokens
         (
             initial_output_tokens,
             initial_output_scores,
         ) = self.initialize_output_tokens(
-            batch, encoder_out=encoder_out, partial_masks=partial_masks
+            input_tokens, encoder_out=encoder_out, partial_masks=partial_masks
         )
         prev_decoder_out = dict(
             output_tokens=initial_output_tokens,
@@ -536,7 +535,7 @@ class DiffusionProteinLanguageModel(nn.Module):
             temperature=temperature,
         )
 
-        prev_decoder_out["output_masks"] = self.get_non_special_sym_mask(
+        prev_decoder_out["output_masks"] = self.get_non_special_symbol_mask(
             prev_decoder_out["output_tokens"], partial_masks=partial_masks
         )
 
@@ -556,7 +555,7 @@ class DiffusionProteinLanguageModel(nn.Module):
             output_scores = decoder_out["output_scores"]
 
             # 2.2: re-mask skeptical parts of low confidence
-            non_special_sym_mask = self.get_non_special_sym_mask(
+            non_special_sym_mask = self.get_non_special_symbol_mask(
                 prev_decoder_out["output_tokens"], partial_masks=partial_masks
             )
 
@@ -589,4 +588,4 @@ class DiffusionProteinLanguageModel(nn.Module):
             )
 
         decoder_out = prev_decoder_out
-        return decoder_out["output_tokens"], decoder_out["output_scores"]
+        return decoder_out['output_tokens']

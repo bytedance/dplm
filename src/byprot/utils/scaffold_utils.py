@@ -219,14 +219,11 @@ def get_motif_dplm(pdb, ori_pdb):
 
     chain = chain_dict[pdb]
     chain_ids = [chain]
-    print("WARNING: USING CHAIN", chain, "FROM PDB FILE")
     structure = esm.inverse_folding.util.load_structure(pdb_clean_path, chain_ids)
     coords, native_seqs = (
         esm.inverse_folding.multichain_util.extract_coords_from_complex(structure)
     )
     sequence = native_seqs[chain_ids[0]]
-    print("sequence extracted from pdb", sequence)
-    print("sequence length", len(sequence))
     assert len(start_idxs) == len(end_idxs)
     sequence = list(sequence)
 
@@ -243,7 +240,6 @@ def get_motif_dplm(pdb, ori_pdb):
                 motif += ["<mask>"] * spacer
     else:
         motif = sequence[start_idxs[0] : end_idxs[0]]
-    print("motif extracted from indexes supplied:", "".join(motif))
 
     return motif
 

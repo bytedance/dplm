@@ -37,45 +37,15 @@ def generate(args, saveto):
             & batch["input_ids"].ne(tokenizer.pad_token_id)
         ).type_as(batch["input_mask"])
 
-        if args.structure_enc:
-            pdb_path = os.path.join(
-                "data-bin/scaffolding-pdbs/" + pdb + "_motif.pdb"
-            )
-            from byprot.datamodules.dataset.data_utils import Alphabet
-
-            alphabet = Alphabet()
-            batch_struct, _ = prepare_data(
-                pdb_path,
-                alphabet,
-                alphabet.featurize,
-                num_seqs=args.num_seqs,
-                device=device,
-            )
-
-            motif_coords = batch_struct["coords"]
-            extend_size = list(motif_coords.size())
-            extend_size[1] = partial_mask.size(1)
-            extend_coords = (
-                torch.zeros(extend_size)
-                .fill_(float("nan"))
-                .type_as(motif_coords)
-            )
-            coords_extent_mask = partial_mask.unsqueeze(-1).unsqueeze(-1)
-            extend_coords.masked_scatter_(coords_extent_mask, motif_coords)
-            batch_struct["coords"] = extend_coords
-            batch_struct["motif_mask"] = partial_mask
-
-            batch.update(batch_struct)
-
         with torch.cuda.amp.autocast():
             outputs = model.generate(
-                input_tokens=batch,
+                input_tokens=batch["input_ids"],
                 temperature=args.temperature,
                 max_iter=max_iter,
                 sampling_strategy=args.sampling_strategy,
                 partial_masks=partial_mask,
             )
-        output_tokens = outputs[0]
+        output_tokens = outputs
 
         print("final:")
         output_results = [

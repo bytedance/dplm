@@ -218,10 +218,10 @@ def run(args):
     else:
         model.cuda()
 
-    for fasta in glob.glob(f"{args.fasta_dir}/**/*.fasta"):
+    for fasta in glob.glob(f"{args.fasta_dir}/**/*.fasta", recursive=True):
         print(fasta)
         if args.pdb is not None:
-            pdbdir = os.path.join(args.pdb, fasta[:-6])
+            pdbdir = os.path.join(args.pdb, os.path.basename(fasta)[:-6])
         else:
             pdbdir = os.path.join(os.path.dirname(fasta), "esmfold_pdb")
         Path(pdbdir).mkdir(exist_ok=True)

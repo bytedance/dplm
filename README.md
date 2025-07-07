@@ -298,7 +298,7 @@ python generate_dplm.py --model_name airkingbd/${model_name} \
 	--saveto ${output_dir}
 
 # Evaluation
-bash anylasis/plddt_compute.sh ${output_dir} # compute pLDDT using ESMFold
+bash anylasis/plddt_calculate.sh ${output_dir} # compute pLDDT using ESMFold
 ```
 
 We also provide evaluation scripts in the  `analysis` folder. Users can use the `analysis/uncond_analysis.ipynb` to obtain average pLDDT score of each length and draw the line chart of the pLDDT score.

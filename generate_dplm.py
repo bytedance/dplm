@@ -72,7 +72,7 @@ def initialize_generation(
 
 def generate(args):
     model = DiffusionProteinLanguageModel.from_pretrained(
-        args.model_name, from_huggingface=False
+        args.model_name
     )
     tokenizer = model.tokenizer
     model = model.eval()

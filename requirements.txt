@@ -25,7 +25,7 @@ nbstripout      # remove output from jupyter notebooks
 
 # --------- others --------- #
 python-dotenv   # loading env variables from .env file
-rich            # beautiful text formatting in terminal
+rich==14.0.0    # beautiful text formatting in terminal
 pytest          # tests
 sh              # for running bash commands in some tests
 pudb            # debugger

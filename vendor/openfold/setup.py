@@ -51,20 +51,36 @@ def get_cuda_bare_metal_version(cuda_dir):
         
         return raw_output, bare_metal_major, bare_metal_minor
 
+_, bare_metal_major, _ = get_cuda_bare_metal_version(CUDA_HOME)
+
+# Target GPUs:
+# - RTX 2080 / 2080 Ti -> 7.5
+# - RTX 3090 -> 8.6
+# - A100 -> 8.0
+# - Ada family (L40/L40S/RTX 6000 Ada, etc.) -> 8.9
+# - H100 -> 9.0
 compute_capabilities = set([
-    (3, 7), # K80, e.g.
-    (5, 2), # Titan X
-    (6, 1), # GeForce 1000-series
+    (7, 5),
+    (8, 0),
+    (8, 6),
+    (8, 9),
+    (9, 0),
 ])
 
-compute_capabilities.add((7, 0))
-_, bare_metal_major, _ = get_cuda_bare_metal_version(CUDA_HOME)
-if int(bare_metal_major) >= 11:
-    compute_capabilities.add((8, 0))
+# compute_capabilities = set([
+#     (3, 7), # K80, e.g.
+#     (5, 2), # Titan X
+#     (6, 1), # GeForce 1000-series
+# ])
 
-compute_capability, _ = get_nvidia_cc()
-if compute_capability is not None:
-    compute_capabilities = set([compute_capability])
+# compute_capabilities.add((7, 0))
+# _, bare_metal_major, _ = get_cuda_bare_metal_version(CUDA_HOME)
+# if int(bare_metal_major) >= 11:
+#     compute_capabilities.add((8, 0))
+
+# compute_capability, _ = get_nvidia_cc()
+# if compute_capability is not None:
+#     compute_capabilities = set([compute_capability])
 
 cc_flag = []
 for major, minor in list(compute_capabilities):

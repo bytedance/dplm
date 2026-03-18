@@ -137,6 +137,25 @@ class DPLM2TrainingTask(TaskLitModule):
         logits, targets, loss_masks, weights = self.model.compute_loss(
             batch, weighting=weighting
         )
+        # compute_loss:
+        # return (
+        #     {
+        #         "aatype": aatype_logits,
+        #         "struct": struct_logits,
+        #     },  # model pred logits
+        #     {
+        #         "aatype": aatype_target,
+        #         "struct": struct_target,
+        #     },  # training targets
+        #     {
+        #         "aatype": aatype_noised["mask"],
+        #         "struct": struct_noised["mask"],
+        #     }, # training loss mask
+        #     {
+        #         "aatype": aatype_weight,
+        #         "struct": struct_weight,
+        #     },  # training loss weight
+        # )
 
         loss, logging_output = self.criterion(
             logits,

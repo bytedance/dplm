@@ -159,6 +159,8 @@ run/logs
 
 byprot-checkpoints/
 generation-results/
+data-bin/
+outputs/
 data-bin/scaffolding-pdbs/*.pdb
 temp.ipynb
 # run/

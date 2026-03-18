@@ -1,12 +1,14 @@
 import argparse
 import os
 
+from tokenizers import AddedToken
 import torch
 import tree
 from Bio import SeqIO
 from peft.peft_model import PeftModel
 from tqdm import tqdm
 
+from byprot.datamodules.dataset.tokenized_protein import DPLM2Tokenizer
 from byprot.models.dplm2 import DPLM2Bit
 from byprot.models.dplm2 import (
     MultimodalDiffusionProteinLanguageModel as DPLM2,
@@ -20,6 +22,11 @@ def initialize_conditional_generation(
     input_data_struct_tokens = []
     input_data_name = []
 
+    # setup input data depending on args.task
+    # ex.) folding: input aa sequence, mask struct tokens
+    # ex.) inverse folding: input struct sequence, mask aa tokens
+    # records = len of sequences in the input fasta file
+    # = len(input_data_aatype) = len(input_data_struct_tokens) = len(input_data_name)
     for record in SeqIO.parse(fasta_path, "fasta"):
         input_data_name.append(record.name)
         if args.task == "folding":
@@ -59,6 +66,18 @@ def initialize_conditional_generation(
     input_data_aatype = list(aa)
     input_data_struct_tokens = list(struct)
     input_data_name = list(name)
+
+#     tokenizer = DPLM2Tokenizer(name_or_path='airkingbd/dplm2_650m', vocab_size=8229, model_max_length=1000000000000000019884624838656, is_fast=False, padding_side='right', truncation_side='right', special_tokens={'aa_cls_token': '<cls_aa>', 'aa_eos_token': '<eos_aa>', 'aa_unk_token': '<unk_aa>', 'aa_mask_token': '<mask_aa>', 'struct_cls_token': '<cls_struct>', 'struct_eos_token': '<eos_struct>', 'struct_unk_token': '<unk_struct>', 'struct_mask_token': '<mask_struct>', 'pad_token': '<pad>'}, clean_up_tokenization_spaces=True),  added_tokens_decoder={
+#         0: AddedToken("<cls_aa>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+#         1: AddedToken("<pad>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+#         2: AddedToken("<eos_aa>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+#         3: AddedToken("<unk_aa>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+#         32: AddedToken("<mask_aa>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+#         33: AddedToken("<cls_struct>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+#         34: AddedToken("<eos_struct>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+#         35: AddedToken("<unk_struct>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+#         8229: AddedToken("<mask_struct>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+#     })
 
     def build_batch(input_data_aatype, input_data_struct_tokens):
         batch_struct = tokenizer.batch_encode_plus(
@@ -304,6 +323,30 @@ def conditional_generate_from_fasta(args):
     batches, name_lists = initialize_conditional_generation(
         args.input_fasta_path, tokenizer, device, args=args, model=model
     )
+
+# ipdb> batches[0]['input_tokens'][0]
+# tensor([  33, 8024, 3768, 7068, 2972, 5722, 7197, 7861, 4444, 4925,  279,  534,
+#         2589, 2975, 3101,  521,   34,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    0,   32,
+#           32,   32,   32,   32,   32,   32,   32,   32,   32,   32,   32,   32,
+#           32,   32,    2,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+#            1,    1,    1,    1,    1,    1,    1,    1], device='cuda:0')
 
     for i, batch in enumerate(tqdm(batches, desc=f"{args.task}")):
         with torch.cuda.amp.autocast(dtype=torch.bfloat16):

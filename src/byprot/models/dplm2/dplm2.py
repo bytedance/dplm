@@ -228,8 +228,9 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
     def forward(self, input_ids, **kwargs):
         input_mask = input_ids.ne(self.pad_id)
+        # input_mask: [B, L], True for not padding token, False for padding
 
-        type_ids = self.get_modality_type(input_ids)
+        type_ids = self.get_modality_type(input_ids) # [B, L] with values in {0, 1, 2}
 
         L = input_ids.shape[1]
         num_heads = self.net.config.num_attention_heads
@@ -260,12 +261,15 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             input_ids, attention_mask=input_mask
         )
 
+        # outputs["logits"]:[B, L, V=8229], outputs["last_hidden_state"]:[B, L, d_model]
         outputs = self.net(
             input_ids=input_ids,
             inputs_embeds=input_embeds,
             attention_mask=attention_bias,
             type_ids=type_ids,
         )
+
+        # import ipdb; ipdb.set_trace()
 
         return outputs
 
@@ -315,8 +319,10 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
         return mixup_input_ids, mixup_loss_mask
 
     def construct_x_t(self, struct_target, aatype_target):
+        # struct_target and aatype_target are both [B, L/2] with padding tokens but no mask tokens
         bsz = struct_target.size(0)
         # seperately add noise to struct and aa
+        # sampling timesteps for struct and aa, with the same shape as batch size, values in [1, num_diffusion_timesteps]
         struct_t = torch.randint(
             1,
             self.cfg.num_diffusion_timesteps + 1,
@@ -347,9 +353,11 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             int(bsz * self.cfg.joint_loss_ratio),
         ]
         split_sizes[-1] = bsz - sum(split_sizes[:-1])
+        # ex) split_sizes: [5, 5, 5, 0, 6]
 
         rand_index = torch.randperm(bsz).type_as(struct_target)
         int_index_list = torch.split(rand_index, split_sizes)
+        # split index for each tasks
 
         bool_index_list = []
         for int_index in int_index_list:
@@ -366,24 +374,35 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             independent_index,
             joint_index,
         ) = bool_index_list
+        # each are [B] shape boolean tensor
 
         struct_t = struct_t.masked_fill(inverse_folding_index, 0)
+        # for inverse folding, we don't add noise to struct, so set t to 0 which corresponds to no noise in the diffusion process
         struct_type_id = self.get_modality_type(struct_target)
+        # tensor([0, 0, 0, ..., 0, 2, 2, 2, ..., 2], device='cuda:0', dtype=torch.int32)
         struct_x_t, struct_loss_mask = self.q_sample(
             struct_target,
             struct_t,
             struct_type_id,
             maskable_mask=self.get_non_special_symbol_mask(struct_target),
         )
+        # struct_x_t is the noised struct input for the model, 
+        # struct_loss_mask is the boolean mask for calculating loss (False for padding indicies and unmasked indices, True for masked indices)
+
         aatype_t = aatype_t.masked_fill(folding_index, 0)
+        # for folding, we don't add noise to aa, so set t to 0 which corresponds to no noise in the diffusion process
         aatype_t = aatype_t.masked_scatter(joint_index, struct_t[joint_index])
+        # for joint training, we want the struct and aa to have the same noise level, so copy struct_t to aatype_t for the joint_index part
         aa_type_id = self.get_modality_type(aatype_target)
+        # tensor([1, 1, 1, ..., 1, 2, 2, 2, ..., 2], device='cuda:0', dtype=torch.int32)
         aatype_x_t, aa_loss_mask = self.q_sample(
             aatype_target,
             aatype_t,
             aa_type_id,
             maskable_mask=self.get_non_special_symbol_mask(aatype_target),
         )
+        # aatype_x_t is the noised aa input for the model,
+        # aa_loss_mask is the boolean mask for calculating loss (False for padding indicies and unmasked indices, True for masked indices)
 
         return (
             {"t": struct_t, "x_t": struct_x_t, "mask": struct_loss_mask},
@@ -401,6 +420,7 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             single_modality_index,
         ) = self.construct_x_t(struct_target, aatype_target)
         x_t = torch.concat([struct_noised["x_t"], aatype_noised["x_t"]], dim=1)
+        # x_t is the noised input for the model, with struct and aa concatenated on the sequence dimension, shape [B, L]
         if self.cfg.self_mixup.enable:
             model_outputs, mixup_loss_mask = self.self_mixup(
                 x_t=x_t,
@@ -415,8 +435,15 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
                 input_ids=x_t,
                 single_modality=single_modality_index,
             )
+            # model_outputs["logits"]: [B, L, V] ex) torch.Size([21, 770, 8229])
+            # model_outputs["last_hidden_state"]: [B, L, model_dim] ex) torch.Size([21, 770, 1280])
+            # Model Output
+            # sequence_output = outputs[0]
+            # logits = self.lm_head(sequence_output)
+            # result = {"logits": logits, "last_hidden_state": sequence_output}
 
         struct_logits, aatype_logits = model_outputs["logits"].chunk(2, dim=1)
+        # struct_logits, aatype_logits:  [B, L/2, V]
         num_timesteps = self.cfg.num_diffusion_timesteps
         struct_weight = {
             "linear": (
@@ -510,7 +537,36 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
         logits[..., self.special_token_list] = -math.inf
 
-        logits = top_k_top_p_filtering(logits, top_p=0.95)
+        # top_k_top_p_filtering(logits.clone(), top_p=0.95)
+        # Memory-efficient top_p: apply only to target positions
+        if output_masks.any():
+            # # --- Verification (remove after confirmed) ---
+            # try:
+            #     logits_original = top_k_top_p_filtering(logits.clone(), top_p=0.95)
+            #     has_original = True
+            # except torch.cuda.OutOfMemoryError:
+            #     has_original = False
+            #     torch.cuda.empty_cache()
+            # # --- End verification ---
+
+            logits[output_masks] = top_k_top_p_filtering(
+                logits[output_masks].unsqueeze(0), top_p=0.95
+            ).squeeze(0)
+
+            # # --- Verification (remove after confirmed) ---
+            # if has_original:
+            #     a = logits[output_masks]
+            #     b = logits_original[output_masks]
+            #     finite_mask = torch.isfinite(a) & torch.isfinite(b)
+            #     inf_match = (a[~finite_mask] == b[~finite_mask]).all()
+            #     max_diff = (a[finite_mask] - b[finite_mask]).abs().max().item() if finite_mask.any() else 0.0
+            #     assert inf_match and max_diff < 1e-6, \
+            #         f"top_p mismatch! max_diff: {max_diff}, inf_match: {inf_match}"
+            #     print(f"[VERIFIED] top_p filtering results match (step {step})")
+            #     del logits_original, a, b, finite_mask
+            # else:
+            #     print(f"[SKIPPED] verification OOM, but efficient version succeeded (step {step})")
+            # # --- End verification ---
 
         if sampling_strategy == "argmax":
             _scores, _tokens = logits.max(-1)
@@ -538,8 +594,10 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
         output_tokens.masked_scatter_(output_masks, _tokens[output_masks])
         output_scores.masked_scatter_(output_masks, _scores[output_masks])
+        # output_masks: [B, L] boolean tensor, True for valid positions, False for positions cls, eos, pad
 
         history.append(output_tokens.clone())
+        # import ipdb; ipdb.set_trace()
 
         return dict(
             output_tokens=output_tokens,
@@ -643,6 +701,8 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
                 lowest_k_mask = lowest_k_mask_1 | lowest_k_mask_2
             else:
                 raise NotImplementedError
+            # lowest_k_mask: [B, L] boolean tensor, True for positions that are in the lowest k scores among all valid positions, False otherwise
+            # import ipdb; ipdb.set_trace()
 
             # Various choices to generate v_t := [v1_t, v2_t].
             # Note that
@@ -674,14 +734,20 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             # for b_t = 0, the token is set to noise if it is in the lowest k scores.
             not_v2_t = lowest_k_mask
 
-            last_mask_position = xt_neq_x0
+            last_mask_position = xt_neq_x0 # True for mask_aa on prev
 
-            masked_to_noise = (~xt_neq_x0 & not_v1_t) | (xt_neq_x0 & not_v2_t)
+            masked_to_noise = (~xt_neq_x0 & not_v1_t) | (xt_neq_x0 & not_v2_t) 
+            # uncond: = lowest_k_mask (not_v1_t == not_v2_t)
+            # cond: (~xt_neq_x0 & not_v1_t) is the conservative part that remasks tokens only when the score gets lower than prev step with same token prediction & lowest_k_mask, 
+            # cond: (xt_neq_x0 & not_v2_t) is the uncond part that masks tokens regardless of score change
+
+            # if (~xt_neq_x0 & masked_to_noise).sum() > 0:
+            #     print("REMASKING OCCURS!")
             if isinstance(noise, torch.Tensor):
                 output_tokens.masked_scatter_(
                     masked_to_noise, noise[masked_to_noise]
                 )
-            elif isinstance(noise, (int, float)):
+            elif isinstance(noise, (int, float)): # noise = 32
                 output_tokens.masked_fill_(masked_to_noise, noise)
             else:
                 raise NotImplementedError(
@@ -689,7 +755,8 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
                 )
             output_scores.masked_fill_(masked_to_noise, -math.inf)
 
-            masked_to_x0 = xt_neq_x0 & ~not_v2_t
+            masked_to_x0 = xt_neq_x0 & ~not_v2_t # mask -> unmask index
+            # masked_to_x0: where to unmask
             output_tokens.masked_scatter_(
                 masked_to_x0, cur_tokens[masked_to_x0]
             )
@@ -704,6 +771,7 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             # # When condition is 'uncond', the not_v1_t is equal to not_v2_t, the new_xt_neq_x0 is always equal to not_v1/v2_t (?)
             new_xt_neq_x0 = (xt_neq_x0 | not_v1_t) & not_v2_t
             assert (new_xt_neq_x0 == not_v2_t).all()
+            # import ipdb; ipdb.set_trace()
             return new_xt_neq_x0, output_tokens, output_scores
 
         aa_position = type_ids.eq(self.aa_type) & non_special_sym_mask
@@ -736,6 +804,8 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
                 non_special_sym_mask=struct_position,
             )
         new_xt_neq_x0 = new_xt_neq_x0_aa | new_xt_neq_x0_struct
+        # print(output_tokens[0][131:146])
+        # print(output_tokens[49][131:259])
         return new_xt_neq_x0, output_tokens, output_scores
 
     def generate(
@@ -753,6 +823,8 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
 
         # 0) encoding
         encoder_out = self.forward_encoder(input_tokens)
+        # ipdb> encoder_out
+        # {}
         # 1) initialized from all mask tokens
         (
             initial_output_tokens,
@@ -760,6 +832,7 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
         ) = self.initialize_output_tokens(
             input_tokens, encoder_out=encoder_out, partial_masks=partial_masks
         )
+        # initial_output_tokens == input_tokens 
         prev_decoder_out = dict(
             output_tokens=initial_output_tokens,
             output_scores=initial_output_scores,
@@ -775,6 +848,46 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
         prev_decoder_out["output_masks"] = self.get_non_special_symbol_mask(
             prev_decoder_out["output_tokens"], partial_masks=partial_masks
         )
+        # ipdb> prev_decoder_out
+        # {'output_tokens': tensor([[  33, 8024, 3768,  ...,    1,    1,    1],
+        # [  33, 1980, 2036,  ...,    1,    1,    1],
+        # [  33, 7644, 6750,  ...,    1,    1,    1],
+        # ...,
+        # [  33, 6365, 2271,  ...,    1,    1,    1],
+        # [  33, 7260, 1376,  ...,    1,    1,    1],
+        # [  33, 7596, 3532,  ...,   32,   32,    2]], device='cuda:0'), 
+        # 'output_scores': tensor([[0., 0., 0.,  ..., 0., 0., 0.],
+        # [0., 0., 0.,  ..., 0., 0., 0.],
+        # [0., 0., 0.,  ..., 0., 0., 0.],
+        # ...,
+        # [0., 0., 0.,  ..., 0., 0., 0.],
+        # [0., 0., 0.,  ..., 0., 0., 0.],
+        # [0., 0., 0.,  ..., 0., 0., 0.]], device='cuda:0'), 
+        # 'output_masks': tensor([[False, False, False,  ..., False, False, False],
+        # [False, False, False,  ..., False, False, False],
+        # [False, False, False,  ..., False, False, False],
+        # ...,
+        # [False, False, False,  ..., False, False, False],
+        # [False, False, False,  ..., False, False, False],
+        # [False, False, False,  ...,  True,  True, False]], device='cuda:0'),
+        # # True for mask_aa, False for else including cls_aa, eos_aa 
+        # 'attentions': None, 'step': 0, 'max_step': 100, 
+        # 'history': [tensor([[  33, 8024, 3768,  ...,    1,    1,    1],
+        # [  33, 1980, 2036,  ...,    1,    1,    1],
+        # [  33, 7644, 6750,  ...,    1,    1,    1],
+        # ...,
+        # [  33, 6365, 2271,  ...,    1,    1,    1],
+        # [  33, 7260, 1376,  ...,    1,    1,    1],
+        # [  33, 7596, 3532,  ...,   32,   32,    2]], device='cuda:0')], 
+        # 'temperature': 1.0, 
+        # 'type_ids': tensor([[0, 0, 0,  ..., 2, 2, 2],
+        # [0, 0, 0,  ..., 2, 2, 2],
+        # [0, 0, 0,  ..., 2, 2, 2],
+        # ...,
+        # [0, 0, 0,  ..., 2, 2, 2],
+        # [0, 0, 0,  ..., 2, 2, 2],
+        # [0, 0, 0,  ..., 1, 1, 1]], device='cuda:0', dtype=torch.int32)}
+        # # 0: struct token(including cls, eos), 1: aa token(including cls, eos), 2: padding token
 
         for step in tqdm(range(max_iter), desc="Decoding"):
             # 2.1: predict
@@ -784,6 +897,7 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
                     partial_masks=partial_masks,
                     sampling_strategy=sampling_strategy,
                 )
+            # import ipdb; ipdb.set_trace()
 
             output_tokens = decoder_out["output_tokens"]
             output_scores = decoder_out["output_scores"]
@@ -792,6 +906,8 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
             non_special_sym_mask = self.get_non_special_symbol_mask(
                 prev_decoder_out["output_tokens"], partial_masks=partial_masks
             )
+            # non_special_sym_mask: [B, L] boolean tensor, True for valid positions, False for positions cls, eos, pad
+            # import ipdb; ipdb.set_trace()
 
             (
                 output_masks,
@@ -809,7 +925,10 @@ class MultimodalDiffusionProteinLanguageModel(nn.Module):
                 t=step + 1,
                 max_step=max_iter,
             )
-
+            # output_masks: [B, L] bool, True for positions that are masked, False for positions that are unmasked
+            # result_tokens: [B, L] int, the new output tokens after reparameterized decoding / highest output_scores index is unmasked
+            # result_scores: [B, L] float, the new output scores after reparameterized decoding / unmasked index -> original output_scores, masked index -> -inf
+            # _reparam_decoding: 
             prev_decoder_out.update(output_masks=output_masks)
             output_tokens = result_tokens
             output_scores = result_scores

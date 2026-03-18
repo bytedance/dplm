@@ -316,7 +316,11 @@ class ModifiedEsmModel(EsmModel):
 @register_model("dplm_esm")
 class EsmForDPLM(EsmForMaskedLM):
     def __init__(self, config, dropout=0.1):
-        tokenizer = AutoTokenizer.from_pretrained(config._name_or_path)
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(config._name_or_path)
+        except ValueError:
+            from byprot.datamodules.dataset.tokenized_protein import DPLM2Tokenizer
+            tokenizer = DPLM2Tokenizer.from_pretrained(config._name_or_path)
         config.hidden_dropout_prob = dropout
 
         EsmPreTrainedModel.__init__(self, config)
@@ -348,6 +352,7 @@ class EsmForDPLM(EsmForMaskedLM):
         return_dict=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
+        **kwargs,
     ):
         attention_mask = input_ids.ne(self.pad_id)
         outputs = self.esm(
